@@ -1,0 +1,22 @@
+<seelog minlevel="debug">
+    <outputs formatid="main">
+        <rollingfile type="size" filename="./log/rootLogger_DEBUG.log" maxsize="102400000" maxrolls="5"/>
+        <filter levels="error">
+            <file path="./log/rootLogger_ERROR.log"/>
+        </filter>
+        <filter levels="info">
+            <file path="./log/rootLogger_INFO.log"/>
+        </filter>		
+        <filter levels="critical">
+            <file path="./log/rootLogger_CRTL.log" formatid="main"/>
+			<!--
+            <smtp formatid="criticalemail" senderaddress="ligang@ccsuntel.com" sendername="dft" hostname="smtp.exmail.qq.com" hostport="25" username="ligang@ccsuntel.com" password="axengine100200">
+                <recipient address="ligang@suntel.com.cn"/>
+            </smtp>-->
+        </filter>
+    </outputs>
+    <formats>
+        <format id="main" format="%Date(2006-01-02 15:04:05.000000) [%LEV] %Msg %FullPath:%Line %n" />
+        <format id="criticalemail" format="Critical error on our server!%n	%Time %Date %RelFile %Func %n %Msg %n	Sent by flowMkt"/>
+    </formats>
+</seelog>
