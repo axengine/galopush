@@ -76,7 +76,7 @@ func newTransaction() *transaction {
 	var t transaction          //mem leak
 	t.exit = make(chan int, 1) //mem leak
 	t.msg = make([]byte, 0)
-	t.timer = time.NewTimer(time.Second * 5) //mem leak
+	//t.timer = time.NewTimer(time.Second * 5) //mem leak
 	return &t
 }
 
@@ -101,15 +101,18 @@ func (p *session) destroy() {
 }
 
 func (p *session) checkTrans(t *transaction) {
-	var tm *time.Timer
-	tm = t.timer
+	if t.msgType != protocol.MSGTYPE_CALLBACK {
+		t.timer = time.NewTimer(time.Second * 5)
+	} else {
+		t.timer = time.NewTimer(time.Second * 300)
+	}
 	go func() {
 		for {
 			select {
 			case <-t.exit: //事务退出
 				p.delTrans(t.tid)
 				return
-			case <-tm.C:
+			case <-t.timer.C:
 				logs.Logger.Debug("Transcation timeout tid=", t.tid, " uid=", p.id, " plat=", p.plat)
 				//time out to save message
 				//只有ANDROID才存离线PUSH WEB什么都不存
