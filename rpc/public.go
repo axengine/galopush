@@ -15,6 +15,7 @@ const (
 )
 
 const (
+	MSG_TYPE_UNKNOW   = 0
 	MSG_TYPE_PUSH     = 1
 	MSG_TYPE_CALLBACK = 2
 	MSG_TYPE_IM       = 3
@@ -25,47 +26,69 @@ const (
 	STATE_ONLINE  = 1
 )
 
-//调用方向:router->comet
-//push
-//callback
-//im
-type Push struct{}
-
-//router向comet发起业务请求，comet的业务数据直接走nsqd
-type PushRequst struct {
-	Tp  int //消息类型
-	Id  string
-	Msg []byte
-}
-
-//调用方向:comet->router
-//comet登记
-//用户状态通知
-//心跳检测
-type Login struct{}
-
-//comet 报告用户在线、离线状态
-type StateRequst struct {
-	CometId  string
-	Id       string
-	Termtype int
-	State    int //1-online 0-offline
-}
-
-//comet启动时报告自身状态
-type LoadRequst struct {
-	CometId string //comet name
+/* Comet向Router注册
+* 方向:Comet->Router
+ */
+type CometRegister struct {
+	CometId string //comet ID
 	TcpAddr string //comet对外开放tcp服务地址
 	WsAddr  string //comet对外开放ws服务地址
 	RpcAddr string //反连地址(comet rpc服务地址)
 }
 
-//公共心跳请求
-type PingRequest struct {
-	TimeStamp int
+/* 鉴权
+*方向:Comet->Router
+ */
+type AuthRequest struct {
+	Id       string
+	Termtype int
+	Code     string
+}
+
+/* 用户socket状态通知
+* 方向:Comet->Router
+ */
+type StateNotify struct {
+	Id       string
+	Termtype int
+	CometId  string //附着Comet ID
+	State    int    //1-online 0-offline
+}
+
+/*推送请求
+* 方向:router->comet
+ */
+type MsgUpwardRequst struct {
+	Id       string
+	Termtype int
+	Msg      string
+}
+
+/* 踢人下线
+*方向:router->comet
+ */
+type KickRequst struct {
+	Id       string
+	Termtype int
+}
+
+/*推送请求
+* 方向:router->comet
+ */
+type PushRequst struct {
+	Tp       int //消息类型
+	Id       string
+	Termtype int
+	Msg      string
+}
+
+/* 心跳检测
+* 方向：RPC客户端->RPC服务端
+ */
+type Ping struct {
 }
 
 //公共应答
 type Response struct {
-	Code int
+	Code int //0-成功 -1-失败
 }

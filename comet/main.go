@@ -12,13 +12,11 @@ import (
 	"github.com/widuu/goini"
 )
 
-var Debug = logs.Logger.Debug
-var Error = logs.Logger.Error
-var Critical = logs.Logger.Critical
-
 type program struct {
 	comet *Comet
 }
+
+var gsComet *Comet
 
 func main() {
 	defer func() {
@@ -36,6 +34,7 @@ func main() {
 	prg := program{
 		comet: &Comet{},
 	}
+	gsComet = prg.comet
 	if err := svc.Run(prg); err != nil {
 		log.Fatal(err)
 	}

@@ -48,5 +48,40 @@ func (p *Router) loadDispatcher(w http.ResponseWriter, r *http.Request) {
 	}
 	addr := p.balancer(id, plat)
 	logs.Logger.Debug("[http] load dispatcher id=", id, " plat=", platS, " addr=", addr)
+
+	//for ajax cross domain
+	Origin := r.Header.Get("Origin")
+	if Origin != "" {
+		w.Header().Add("Access-Control-Allow-Origin", Origin)
+		w.Header().Add("Access-Control-Allow-Methods", "POST,GET,OPTIONS,DELETE")
+		w.Header().Add("Access-Control-Allow-Headers", "x-requested-with,content-type")
+		w.Header().Add("Access-Control-Allow-Credentials", "true")
+	}
+
 	fmt.Fprintf(w, addr)
+}
+
+//balancer HTTP接口 根据id和plat返回socket地址
+func (p *Router) balancer(id string, plat int) string {
+	s := p.pool.findSessions(id)
+	if s != nil {
+		c := p.pool.findComet(s.cometId)
+		if c != nil {
+			if plat == protocol.PLAT_WEB {
+				return c.wsAddr
+			} else {
+				return c.tcpAddr
+			}
+		}
+	}
+	//系统指配
+	c := p.pool.balancer()
+	if c != nil {
+		if plat == 8 {
+			return c.wsAddr
+		} else {
+			return c.tcpAddr
+		}
+	}
+	return ""
 }

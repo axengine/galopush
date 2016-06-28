@@ -42,17 +42,19 @@ func init() {
 	client = cli
 }
 
-func push(token, topic, msg string) error {
+func apnsPush(token, topic, msg string) error {
 	notification := &apns.Notification{}
 	notification.DeviceToken = token
 	notification.Topic = topic
 	notification.Payload = []byte(msg)
 	res, err := client.Push(notification)
 	if err != nil {
+		logs.Logger.Error(err)
 		return err
 	}
 	if res.StatusCode != 200 {
 		errs := fmt.Sprintf("push apns with error statusCode %d", res.StatusCode)
+		logs.Logger.Error(errs)
 		return errors.New(errs)
 	}
 	return nil

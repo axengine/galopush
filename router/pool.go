@@ -1,5 +1,9 @@
 package main
 
+/**
+* 用户池后期改造为redis或者mongodb持久化
+ */
+
 import (
 	"galopush/rpc"
 	"sync"
@@ -12,25 +16,27 @@ type Pool struct {
 	sessions map[string]*session
 }
 
+//用户session
 type session struct {
 	id      string
-	cometId string
+	cometId string //用户所附着的comet
 	item    []item
 }
 
 type item struct {
-	plat   int
-	online bool
+	plat        int    //终端类型
+	online      bool   //推送接口是否在线
+	authCode    string //业务层鉴权码
+	login       bool   //业务层是否已经登录
+	deviceToken string //苹果设备token
 }
 
 type comet struct {
-	id        string
-	rpcClient *rpc.RpcClient
-	tcpAddr   string //comet对外开放tcp服务地址
-	wsAddr    string //comet对外开放ws服务地址
-
-	online  int
-	offline int
+	id        string         //comet id
+	rpcClient *rpc.RpcClient //router连接到本comet的RPC客户端句柄
+	tcpAddr   string         //comet对外开放tcp服务地址
+	wsAddr    string         //comet对外开放ws服务地址
+	online    int            //comet在线统计
 }
 
 func (p *Pool) insertComet(id string, c *comet) {
@@ -108,13 +114,15 @@ func (p *Pool) deleteSessions(id string) {
 	delete(p.sessions, id)
 }
 
+//deleteSessionsWithCometId 指定cometid的所有用户下线
 func (p *Pool) deleteSessionsWithCometId(id string) {
 	p.m2.Lock()
 	defer p.m2.Unlock()
-	for k, v := range p.sessions {
+	for _, v := range p.sessions {
 		if v.cometId == id {
-			delete(p.sessions, k)
+			for _, it := range v.item {
+				it.online = false
+			}
 		}
 	}
-
 }

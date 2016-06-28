@@ -1,6 +1,8 @@
 package main
 
 import (
+	"galopush/logs"
+	"galopush/protocol"
 	"sync"
 	"time"
 )
@@ -52,14 +54,14 @@ func (p *Pool) findSessions(id string) *session {
 }
 
 type session struct {
-	id     string
-	plat   int
-	conn   interface{}
-	encode int
-
-	tid   int
-	mutex sync.Mutex
-	trans []*transaction
+	id         string
+	plat       int
+	conn       interface{}
+	encode     int
+	appleToken string
+	tid        int
+	mutex      sync.Mutex
+	trans      []*transaction
 }
 
 type transaction struct {
@@ -79,7 +81,7 @@ func newTransaction() *transaction {
 }
 
 var (
-	MaxUint32 = 1<<32 - 1
+	MaxUint32 = 1<<31 - 1
 )
 
 func (p *session) nextTid() int {
@@ -108,8 +110,16 @@ func (p *session) checkTrans(t *transaction) {
 				p.delTrans(t.tid)
 				return
 			case <-tm.C:
+				logs.Logger.Debug("Transcation timeout tid=", t.tid, " uid=", p.id, " plat=", p.plat)
 				//time out to save message
-				//store.Store(this.Uid, t.Msg)
+				//只有ANDROID才存离线PUSH WEB什么都不存
+				if t.msgType == protocol.MSGTYPE_PUSH && p.plat == protocol.PLAT_ANDROID {
+					gsComet.store.SavePushMsg(p.id, t.msg)
+				} else if t.msgType == protocol.MSGTYPE_CALLBACK && p.plat != protocol.PLAT_WEB {
+					gsComet.store.SaveCallbackMsg(p.id, p.plat, t.msg)
+				} else if t.msgType == protocol.MSGTYPE_MESSAGE && p.plat != protocol.PLAT_WEB {
+					gsComet.store.SaveImMsg(p.id, p.plat, t.msg)
+				}
 				t.exit <- 1
 			}
 		}

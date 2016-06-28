@@ -24,7 +24,7 @@ func (p *Comet) wsServ() {
 }
 
 func (p *Comet) handlerWsconn(conn *websocket.Conn) {
-	Debug("new ws conn from ", conn.Request().RemoteAddr, " localaddr:", conn.LocalAddr().String())
+	logs.Logger.Debug("new ws conn from ", conn.Request().RemoteAddr, " localaddr:", conn.LocalAddr().String())
 	defer func() {
 		if r := recover(); r != nil {
 			logs.Logger.Error("recover ", r)
@@ -47,7 +47,7 @@ func (p *Comet) handlerWsconn(conn *websocket.Conn) {
 		}
 
 		if err = p.unMarshal(conn, buf); err != nil {
-			logs.Logger.Error("protocol.DecodeJson error=", err, " buf=", buf)
+			logs.Logger.Error("protocol.DecodeJson error=", err, " buf=", string(buf[:]))
 			return
 		}
 	}

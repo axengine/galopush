@@ -11,20 +11,7 @@ import (
 
 //鉴权接口
 func (p *Comet) auth(id string, plat int, token string) error {
-	return nil
-}
-
-//获取用户终端类型接口
-func (p *Comet) userInfo(id string) []string {
-	var plats []string
-	plats = append(plats, "Android")
-	plats = append(plats, "Web")
-	return plats
-}
-
-//推送苹果APNS
-func apnsPush(id string, msg []byte) error {
-	return nil
+	return p.rpcCli.Auth(id, plat, token)
 }
 
 //根据连接类型设定协议类型
@@ -75,7 +62,8 @@ func (p *Comet) write(conn interface{}, buf []byte) error {
 		}
 	case *websocket.Conn:
 		ws := conn.(*websocket.Conn)
-		err = websocket.Message.Send(ws, buf)
+		//err = websocket.Message.Send(ws, buf)
+		err = websocket.Message.Send(ws, string(buf[:]))
 		if err != nil {
 			logs.Logger.Error("Write:", err)
 		}

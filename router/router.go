@@ -27,6 +27,8 @@ type Router struct {
 	topics        []string
 	discover      *nsq.TopicDiscoverer
 	nsqlookupAddr []string
+	nsqdTcpAddr   string
+	producer      *nsq.Producer //nsq生产者
 
 	//负载路由
 	httpBindAddr string
@@ -43,40 +45,51 @@ type Router struct {
 
 func (p *Router) Init() {
 	conf := goini.SetConfig("./config.ini")
+	Debug("--------OnInit--------")
+	//RPC
+	{
+		p.routerRpcAddr = conf.GetValue("router", "rpcAddr")
+		s := conf.GetValue("router", "rpcServerCache")
+		p.maxRpcInFight, _ = strconv.Atoi(s)
+		Debug("----router rpc addr=", p.routerRpcAddr, " cache=", p.maxRpcInFight)
+	}
 
-	p.routerRpcAddr = conf.GetValue("router", "rpcAddr")
-	s := conf.GetValue("router", "rpcServerCache")
-	p.maxRpcInFight, _ = strconv.Atoi(s)
+	//NSQ
+	{
+		s := conf.GetValue("nsq", "nsqlookupAddr")
+		p.nsqlookupAddr = strings.Split(s, ",")
+		s = conf.GetValue("nsq", "topics")
+		p.topics = strings.Split(s, ",")
+		p.nsqdTcpAddr = conf.GetValue("nsq", "tcpAddr")
+		Debug("----nsqd nsqlookup addr=", p.nsqlookupAddr, " topics=", p.topics)
+	}
 
-	//nsq costmer
-	s = conf.GetValue("nsq", "nsqlookupAddr")
-	p.nsqlookupAddr = strings.Split(s, ",")
-	s = conf.GetValue("nsq", "topics")
-	p.topics = strings.Split(s, ",")
+	//HTTP
+	{
+		p.httpBindAddr = conf.GetValue("http", "bindAddr")
+		Debug("----http addr=", p.httpBindAddr, " cache=", p.maxRpcInFight)
+	}
 
-	p.httpBindAddr = conf.GetValue("http", "bindAddr")
 	p.cometExit = make(chan string)
 
 	p.pool = new(Pool)
 	p.pool.comets = make(map[string]*comet)
 	p.pool.sessions = make(map[string]*session)
 
-	//离线消息
-	dbconn := conf.GetValue("redis", "conn")
-	password := conf.GetValue("redis", "password")
-	password = strings.TrimSpace(password)
-	databaseS := conf.GetValue("redis", "database")
-	database, err := strconv.Atoi(databaseS)
-	if err != nil {
-		database = 0
+	//REDIS
+	{
+		dbconn := conf.GetValue("redis", "conn")
+		password := conf.GetValue("redis", "password")
+		password = strings.TrimSpace(password)
+		databaseS := conf.GetValue("redis", "database")
+		database, err := strconv.Atoi(databaseS)
+		if err != nil {
+			database = 0
+		}
+		p.store = redisstore.NewStorager(dbconn, password, database)
+		Debug("----redis addr=", dbconn, " password:", password, " database:", database)
 	}
-	p.store = redisstore.NewStorager(dbconn, password, database)
 
-	Debug("--------OnInit--------")
-	Debug("----nsqd nsqlookup addr=", p.nsqlookupAddr, " topics=", p.topics)
-	Debug("----router rpc addr=", p.routerRpcAddr, " cache=", p.maxRpcInFight)
-	Debug("----http addr=", p.httpBindAddr, " cache=", p.maxRpcInFight)
-	Debug("----redis addr=", dbconn, " password:", password, " database:", database)
 	Debug("--------Init success--------")
 }
 
@@ -87,7 +100,7 @@ func (p *Router) Start() {
 			go p.Start()
 		}
 	}()
-	p.rpcServer = rpc.NewRpcServer(p.routerRpcAddr, p.maxRpcInFight, p.rpcSyncHandle, p.rpcAsyncHandle)
+	p.rpcServer = rpc.NewRpcServer(p.routerRpcAddr, p.maxRpcInFight, p.RpcSyncHandle, p.RpcAsyncHandle)
 
 	//处理comet异常中断 清除comet以及comet上注册的用户
 	go func() {
@@ -100,28 +113,30 @@ func (p *Router) Start() {
 		}
 	}()
 
-	p.discover = nsq.NewTopicDiscoverer(p.topics, p.maxRpcInFight, p.nsqlookupAddr, p.nsqHandle)
+	p.discover = nsq.NewTopicDiscoverer(p.topics, p.maxRpcInFight, p.nsqlookupAddr, p.NsqHandler)
+	producer, err := nsq.NewProducer(p.nsqdTcpAddr)
+	if err != nil {
+		panic(err)
+	}
+	p.producer = producer
 
 	p.startHttpServer()
 
-	//p.wg.Add(1)
-	Debug("start router success")
+	Debug("--------Start Router success--------")
 }
 
 func (p *Router) Stop() error {
 	debug.PrintStack()
 	close(p.exit)
-	//p.wg.Wait()
 	return nil
 }
 
 //newRpcClient 返回一个RPC客户端
-func (p *Router) newRpcClient(addr string) (error, *rpc.RpcClient) {
-	err, c := rpc.NewRpcClient(addr)
+func (p *Router) NewRpcClient(addr string) (*rpc.RpcClient, error) {
+	c, err := rpc.NewRpcClient(addr)
 	if err != nil {
-		logs.Logger.Error(err)
-		return err, c
+		logs.Logger.Error("NewRpcClient ", err)
+		return c, err
 	}
-	//c.StartPing()
-	return err, c
+	return c, err
 }

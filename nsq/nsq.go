@@ -83,7 +83,7 @@ type Producer struct {
 func NewProducer(destNsqdTCPAddrs string) (*Producer, error) {
 	var p Producer
 	cfg := nsq.NewConfig()
-	cfg.UserAgent = "comet v0.1"
+	cfg.UserAgent = "router v0.1"
 	producer, err := nsq.NewProducer(destNsqdTCPAddrs, cfg)
 	if err != nil {
 		panic(err)

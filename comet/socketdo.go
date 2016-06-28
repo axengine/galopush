@@ -85,35 +85,9 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 	//是否重复发送注册消息
 	if ids := p.pool.findId(addr); ids != "" {
 		logs.Logger.Error("[register] repeat register  id=", id, " plat=", plat, " token=", token, " addr=", addr)
-		authCode = 1
+		authCode = 0
 		p.response(conn, msgType+1, encode, request.Tid, authCode, pType)
 		return
-	}
-
-	//互斥登陆 && 重复登陆
-	if plat == protocol.PLAT_ANDROID || plat == protocol.PLAT_IOS {
-		idAndroid := fmt.Sprintf("%s-%d", id, protocol.PLAT_ANDROID)
-		idIos := fmt.Sprintf("%s-%d", id, protocol.PLAT_IOS)
-		//BUG 互斥时断开旧连接可能导致删除新插入的session 此处为临时解决办法
-		//TODO 先删除旧session所有关系，连接断开时则找不到session了
-		if s := p.pool.findSessions(idAndroid); s != nil {
-			logs.Logger.Error("[register] mutex ", idAndroid, " current plat ", plat, " close old conn ", connString(s.conn))
-
-			p.rpcCli.State(s.id, p.cometId, rpc.STATE_OFFLINE, s.plat)
-			s.destroy()
-			p.pool.deleteSessions(idAndroid)
-			p.pool.deleteIds(connString(s.conn))
-			p.closeConn(s.conn)
-		}
-		if s := p.pool.findSessions(idIos); s != nil {
-			logs.Logger.Error("[register] mutex ", idIos, " current plat ", plat, " close old conn ", connString(s.conn))
-
-			p.rpcCli.State(s.id, p.cometId, rpc.STATE_OFFLINE, s.plat)
-			s.destroy()
-			p.pool.deleteSessions(idAndroid)
-			p.pool.deleteIds(connString(s.conn))
-			p.closeConn(s.conn)
-		}
 	}
 
 	//建立session 并初始化
@@ -134,7 +108,7 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 	p.response(conn, msgType+1, encode, request.Tid, authCode, pType)
 
 	//上报到router
-	p.rpcCli.State(id, p.cometId, rpc.STATE_ONLINE, plat)
+	p.rpcCli.Notify(id, p.cometId, rpc.STATE_ONLINE, plat)
 
 	//离线消息处理
 	switch plat {
@@ -152,10 +126,19 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 			sendMsg.Flag = 1
 
 			buf := protocol.Pack(&sendMsg, protocol.PROTOCOL_TYPE_BINARY)
-			//protocol.CodecEncode(buf[protocol.HEADER_LEN:], int(sendMsg.Len), sess.encode)
 			logs.Logger.Debug("[on register] send offline push msg id=", id, " count=", offCount, " buff=", buff)
-			if err := p.write(sess.conn, buf); err != nil {
-				logs.Logger.Error("push write error:", err)
+			if err := p.write(sess.conn, buf); err == nil {
+				//创建事务并保存
+				trans := newTransaction()
+				trans.tid = int(sendMsg.Tid)
+				trans.msgType = protocol.MSGTYPE_PUSH
+				trans.msg = append(trans.msg, buff...) //mem leak
+				sess.saveTransaction(trans)
+				sess.checkTrans(trans)
+			} else {
+				//推送失败存储离线消息
+				logs.Logger.Error("write to addr ", connString(sess.conn), " err ", err)
+				p.store.SavePushMsg(id, buff)
 			}
 		}
 		//需处理离线callback & im
@@ -170,14 +153,23 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 			sendMsg.Msg = append(sendMsg.Msg, buff...)
 
 			buf := protocol.Pack(&sendMsg, protocol.PROTOCOL_TYPE_BINARY)
-			//protocol.CodecEncode(buf[protocol.HEADER_LEN:], int(sendMsg.Len), sess.encode)
 			logs.Logger.Debug("[on register] send offline callback msg id=", id, " msg=", buff)
-			if err := p.write(sess.conn, buf); err != nil {
-				logs.Logger.Error("push write error:", err)
+			if err := p.write(sess.conn, buf); err == nil {
+				//创建事务并保存
+				trans := newTransaction()
+				trans.tid = int(sendMsg.Tid)
+				trans.msgType = protocol.MSGTYPE_CALLBACK
+				trans.msg = append(trans.msg, buff...) //mem leak
+				sess.saveTransaction(trans)
+				sess.checkTrans(trans)
+			} else {
+				//推送失败存储离线消息
+				logs.Logger.Error("write to addr ", connString(sess.conn), " err ", err)
+				p.store.SaveCallbackMsg(id, plat, buff)
 			}
 		}
 
-		imBuffSlice := p.store.GetCallbackMsg(id, plat)
+		imBuffSlice := p.store.GetImMsg(id, plat)
 		for _, v := range imBuffSlice {
 			buff := v
 			var sendMsg protocol.Im
@@ -188,10 +180,19 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 			sendMsg.Msg = append(sendMsg.Msg, buff...)
 
 			buf := protocol.Pack(&sendMsg, protocol.PROTOCOL_TYPE_BINARY)
-			//protocol.CodecEncode(buf[protocol.HEADER_LEN:], int(sendMsg.Len), sess.encode)
 			logs.Logger.Debug("[on register] send offline callback msg id=", id, " msg=", buff)
-			if err := p.write(sess.conn, buf); err != nil {
-				logs.Logger.Error("push write error:", err)
+			if err := p.write(sess.conn, buf); err == nil {
+				//创建事务并保存
+				trans := newTransaction()
+				trans.tid = int(sendMsg.Tid)
+				trans.msgType = protocol.MSGTYPE_MESSAGE
+				trans.msg = append(trans.msg, buff...) //mem leak
+				sess.saveTransaction(trans)
+				sess.checkTrans(trans)
+			} else {
+				//推送失败存储离线消息
+				logs.Logger.Error("write to addr ", connString(sess.conn), " err ", err)
+				p.store.SaveImMsg(id, plat, buff)
 			}
 		}
 	case protocol.PLAT_IOS:
@@ -207,14 +208,23 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 			sendMsg.Msg = append(sendMsg.Msg, buff...)
 
 			buf := protocol.Pack(&sendMsg, protocol.PROTOCOL_TYPE_BINARY)
-			//protocol.CodecEncode(buf[protocol.HEADER_LEN:], int(sendMsg.Len), sess.encode)
 			logs.Logger.Debug("[on register] send offline callback msg id=", id, " msg=", buff)
-			if err := p.write(sess.conn, buf); err != nil {
-				logs.Logger.Error("push write error:", err)
+			if err := p.write(sess.conn, buf); err == nil {
+				//创建事务并保存
+				trans := newTransaction()
+				trans.tid = int(sendMsg.Tid)
+				trans.msgType = protocol.MSGTYPE_CALLBACK
+				trans.msg = append(trans.msg, buff...) //mem leak
+				sess.saveTransaction(trans)
+				sess.checkTrans(trans)
+			} else {
+				//推送失败存储离线消息
+				logs.Logger.Error("write to addr ", connString(sess.conn), " err ", err)
+				p.store.SaveCallbackMsg(id, plat, buff)
 			}
 		}
 
-		imBuffSlice := p.store.GetCallbackMsg(id, plat)
+		imBuffSlice := p.store.GetImMsg(id, plat)
 		for _, v := range imBuffSlice {
 			buff := v
 			var sendMsg protocol.Im
@@ -225,10 +235,19 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 			sendMsg.Msg = append(sendMsg.Msg, buff...)
 
 			buf := protocol.Pack(&sendMsg, protocol.PROTOCOL_TYPE_BINARY)
-			//protocol.CodecEncode(buf[protocol.HEADER_LEN:], int(sendMsg.Len), sess.encode)
-			logs.Logger.Debug("[on register] send offline callback msg id=", id, " msg=", buff)
-			if err := p.write(sess.conn, buf); err != nil {
-				logs.Logger.Error("push write error:", err)
+			logs.Logger.Debug("[on register] send offline im msg id=", id, " msg=", buff)
+			if err := p.write(sess.conn, buf); err == nil {
+				//创建事务并保存
+				trans := newTransaction()
+				trans.tid = int(sendMsg.Tid)
+				trans.msgType = protocol.MSGTYPE_MESSAGE
+				trans.msg = append(trans.msg, buff...) //mem leak
+				sess.saveTransaction(trans)
+				sess.checkTrans(trans)
+			} else {
+				//推送失败存储离线消息
+				logs.Logger.Error("write to addr ", connString(sess.conn), " err ", err)
+				p.store.SaveImMsg(id, plat, buff)
 			}
 		}
 	}
@@ -252,7 +271,7 @@ func (p *Comet) procUnRegister(conn interface{}) {
 	logs.Logger.Debug("[unregister] success sess=", sess, " addr=", addr)
 
 	//通知router
-	p.rpcCli.State(sess.id, p.cometId, rpc.STATE_OFFLINE, sess.plat)
+	p.rpcCli.Notify(sess.id, p.cometId, rpc.STATE_OFFLINE, sess.plat)
 
 	sess.destroy()
 
@@ -283,8 +302,7 @@ func (p *Comet) procIm(conn interface{}, msg *protocol.Im) {
 	}
 	logs.Logger.Debug("[IM]   addr=", addr, " sess=", sess, " msg=", string(request.Msg[:]))
 
-	//发送给NSQ
-	err := p.producer.Publish(p.topic, request.Msg)
+	err := p.rpcCli.MsgUpward(id, sess.plat, string(request.Msg))
 	if err != nil {
 		//应答
 		logs.Logger.Error("[IM]  publish to nsq err=", err, " addr=", addr, " sess=", sess)
@@ -292,7 +310,6 @@ func (p *Comet) procIm(conn interface{}, msg *protocol.Im) {
 	} else {
 		p.response(conn, msgType+1, encode, request.Tid, 0, pType)
 	}
-
 	return
 }
 
@@ -341,6 +358,7 @@ func (p *Comet) response(conn interface{}, msgType int, encode int, tid uint32, 
 	resp.Len = uint32(binary.Size(resp.ParamResp))
 	resp.Code = code
 	buf := protocol.Pack(&resp, protocolType)
+	logs.Logger.Debug("send:", string(buf[:]))
 	return p.write(conn, buf)
 }
 
