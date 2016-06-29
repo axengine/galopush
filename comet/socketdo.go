@@ -358,7 +358,7 @@ func (p *Comet) response(conn interface{}, msgType int, encode int, tid uint32, 
 	resp.Len = uint32(binary.Size(resp.ParamResp))
 	resp.Code = code
 	buf := protocol.Pack(&resp, protocolType)
-	logs.Logger.Debug("send:", string(buf[:]))
+	logs.Logger.Debug("send:", buf)
 	return p.write(conn, buf)
 }
 

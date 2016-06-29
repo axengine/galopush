@@ -29,8 +29,8 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 			//查找session
 			sess := p.pool.findSessions(msg.Uid)
 			if sess != nil {
+				var find bool
 				for _, v := range sess.item {
-					var find bool
 					//找到对应终端类型
 					if v.plat == msg.Termtype {
 						find = true
@@ -68,17 +68,17 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 							}
 						}
 					}
-					//有session但无对应终端类型
-					if find == false {
-						var it item
-						it.plat = msg.Termtype
-						it.online = false
-						it.authCode = msg.Code
-						it.deviceToken = msg.DeviceToken
-						it.login = msg.Login
-						sess.item = append(sess.item, &it)
-						logs.Logger.Debug("userOnlineState New Item=", it)
-					}
+				}
+				//有session但无对应终端类型
+				if find == false {
+					var it item
+					it.plat = msg.Termtype
+					it.online = false
+					it.authCode = msg.Code
+					it.deviceToken = msg.DeviceToken
+					it.login = msg.Login
+					sess.item = append(sess.item, &it)
+					logs.Logger.Debug("userOnlineState New Item=", it)
 				}
 			} else {
 				//没有找到session
