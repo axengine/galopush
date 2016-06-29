@@ -6,30 +6,30 @@ comet与终端（已定义Android、iOS、winPhone、web、PCClient等）之间�
 
 协议定义
 ---------------------------
-bit        7        6        5        4        3        2        1       0
-> byte1	EnCode(2bit)	Message-Type(6bit)
-> byte2	Transaction  ID(4bytes)
-> byte3	
-> byte4	
-> byte5	
-> byte6	Body-len(4bytes 可选)
-> byte7	
-> byte8	
-> byte9	
-> byte...	消息体（可选）
+	bit        7        6        5        4        3        2        1       0
+	byte1	EnCode(2bit)	Message-Type(6bit)
+	byte2	Transaction  ID(4bytes)
+	byte3	
+	byte4	
+	byte5	
+	byte6	Body-len(4bytes 可选)
+	byte7	
+	byte8	
+	byte9	
+	byte...	消息体（可选）
 
 #### 消息类型	值	描述
-> Reserved	0	保留
-> REGISTER	1	注册，UA或Service向gComet发起注册
-> REGRESP	2	注册应答
-> PING	3	客户端发起心跳消息，心跳间隔建议300S
-> PONG	4	心跳应答
-> PUSH	5	推送消息
-> PUSHRESP	6	推送应答
-> CALLBACK	7	回调消息，回调超时时长60S
-> CBRESP	8	回调应答
-> IM	9	即时消息请求
-> IMRESP	10	即时消息应答
+	Reserved	0	保留
+	REGISTER	1	注册，UA或Service向gComet发起注册
+	REGRESP	2	注册应答
+	PING	3	客户端发起心跳消息，心跳间隔建议300S
+	PONG	4	心跳应答
+	PUSH	5	推送消息
+	PUSHRESP	6	推送应答
+	CALLBACK	7	回调消息，回调超时时长60S
+	CBRESP	8	回调应答
+	IM	9	即时消息请求
+	IMRESP	10	即时消息应答
 
 ### EnCode
 	指定消息体编码（加密）方式
