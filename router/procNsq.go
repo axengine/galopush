@@ -27,8 +27,6 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 			}
 
 			//查找session
-			p.pool.m2.Lock()
-			defer p.pool.m2.Unlock()
 			sess := p.pool.findSessions(msg.Uid)
 			if sess != nil {
 				for _, v := range sess.item {
@@ -36,10 +34,12 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 					//找到对应终端类型
 					if v.plat == msg.Termtype {
 						find = true
+						logs.Logger.Debug("userOnlineState Find Item=", v)
 						if v.login == true && msg.Login == true {
 							//踢人
 							c := p.pool.findComet(sess.cometId)
 							if c != nil {
+								logs.Logger.Debug("userOnlineState Kick id=", sess.id, " palt=", v.plat)
 								c.rpcClient.Kick(sess.id, v.plat)
 							}
 						}
@@ -51,6 +51,7 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 							//踢人
 							c := p.pool.findComet(sess.cometId)
 							if c != nil {
+								logs.Logger.Debug("userOnlineState Kick id=", sess.id, " palt=", v.plat)
 								c.rpcClient.Kick(sess.id, v.plat)
 							}
 						}
@@ -61,6 +62,7 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 								//踢人
 								c := p.pool.findComet(sess.cometId)
 								if c != nil {
+									logs.Logger.Debug("userOnlineState Kick id=", sess.id, " palt=", v.plat)
 									c.rpcClient.Kick(sess.id, v.plat)
 								}
 							}
@@ -74,7 +76,8 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 						it.authCode = msg.Code
 						it.deviceToken = msg.DeviceToken
 						it.login = msg.Login
-						sess.item = append(sess.item, it)
+						sess.item = append(sess.item, &it)
+						logs.Logger.Debug("userOnlineState New Item=", it)
 					}
 				}
 			} else {
@@ -86,8 +89,9 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 				it.authCode = msg.Code
 				it.deviceToken = msg.DeviceToken
 				it.login = msg.Login
-				sess.item = append(sess.item, it)
+				sess.item = append(sess.item, &it)
 				p.pool.insertSessions(msg.Uid, sess)
+				logs.Logger.Debug("userOnlineState New session ", sess)
 			}
 		}
 	case p.topics[1], p.topics[2], p.topics[3]: //push callback message
@@ -107,8 +111,6 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 				msgType = protocol.MSGTYPE_MESSAGE
 			}
 
-			p.pool.m2.Lock()
-			defer p.pool.m2.Unlock()
 			for _, receiver := range msg.Receivers {
 				sess := p.pool.findSessions(receiver.Uid)
 				if sess != nil {

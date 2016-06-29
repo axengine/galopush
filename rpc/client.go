@@ -173,6 +173,7 @@ func (p *RpcClient) Push(msgType int, id string, termtype int, msg string) error
 	var request PushRequst
 	request.Tp = msgType
 	request.Id = id
+	request.Termtype = termtype
 	request.Msg = msg
 
 	var respone Response

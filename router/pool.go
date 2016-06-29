@@ -20,7 +20,7 @@ type Pool struct {
 type session struct {
 	id      string
 	cometId string //用户所附着的comet
-	item    []item
+	item    []*item
 }
 
 type item struct {

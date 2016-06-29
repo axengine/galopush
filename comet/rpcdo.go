@@ -92,14 +92,6 @@ func (p *Comet) push(msg *rpc.PushRequst) {
 		buf := protocol.Pack(&sendMsg, ptlType)
 		logs.Logger.Debug("([PUSH]  to id=", id, " plat=", plat, " Tid=", sendMsg.Tid, " offline=", sendMsg.Offline, " flag=", sendMsg.Flag)
 		if err := p.write(sess.conn, buf); err != nil {
-			//创建事务并保存
-			trans := newTransaction()
-			trans.tid = int(sendMsg.Tid)
-			trans.msgType = protocol.MSGTYPE_PUSH
-			trans.msg = append(trans.msg, msg.Msg...) //mem leak
-			sess.saveTransaction(trans)
-			sess.checkTrans(trans)
-		} else {
 			logs.Logger.Error("PUSH write error:", err)
 			if plat == protocol.PLAT_ANDROID {
 				p.store.SavePushMsg(id, []byte(msg.Msg))
@@ -107,13 +99,20 @@ func (p *Comet) push(msg *rpc.PushRequst) {
 				//APNS
 				apnsPush(sess.appleToken, msg.Msg, "")
 			}
+
+		} else {
+			//创建事务并保存
+			trans := newTransaction()
+			trans.tid = int(sendMsg.Tid)
+			trans.msgType = protocol.MSGTYPE_PUSH
+			trans.msg = append(trans.msg, msg.Msg...) //mem leak
+			sess.saveTransaction(trans)
+			sess.checkTrans(trans)
 		}
 	} else {
-		if plat == protocol.PLAT_ANDROID {
+		//这里没有session 找不到ios的设备ID 直接存离线
+		if plat != protocol.PLAT_WEB {
 			p.store.SavePushMsg(id, []byte(msg.Msg))
-		} else if plat == protocol.PLAT_IOS {
-			//APNS
-			apnsPush(sess.appleToken, msg.Msg, "")
 		}
 	}
 }
@@ -139,6 +138,11 @@ func (p *Comet) callback(msg *rpc.PushRequst) {
 		buf := protocol.Pack(&sendMsg, ptlType)
 		logs.Logger.Debug("([CALLBACK]  to id=", id, " plat=", plat, " Tid=", sendMsg.Tid)
 		if err := p.write(sess.conn, buf); err != nil {
+			logs.Logger.Error("CALLBACK write error:", err)
+			if plat != protocol.PLAT_WEB {
+				p.store.SaveCallbackMsg(id, plat, []byte(msg.Msg))
+			}
+		} else {
 			//创建事务并保存
 			trans := newTransaction()
 			trans.tid = int(sendMsg.Tid)
@@ -146,11 +150,6 @@ func (p *Comet) callback(msg *rpc.PushRequst) {
 			trans.msg = append(trans.msg, []byte(msg.Msg)...) //mem leak
 			sess.saveTransaction(trans)
 			sess.checkTrans(trans)
-		} else {
-			logs.Logger.Error("CALLBACK write error:", err)
-			if plat != protocol.PLAT_WEB {
-				p.store.SaveCallbackMsg(id, plat, []byte(msg.Msg))
-			}
 		}
 	} else {
 		if plat != protocol.PLAT_WEB {
@@ -174,12 +173,17 @@ func (p *Comet) message(msg *rpc.PushRequst) {
 		protocol.SetMsgType(&sendMsg.Header, protocol.MSGTYPE_MESSAGE)
 		protocol.SetEncode(&sendMsg.Header, sess.encode)
 		sendMsg.Tid = uint32(sess.nextTid())
-		sendMsg.Len = uint32(len(msg.Msg) + 3)
+		sendMsg.Len = uint32(len(msg.Msg))
 		sendMsg.Msg = append(sendMsg.Msg, []byte(msg.Msg)...)
 
 		buf := protocol.Pack(&sendMsg, ptlType)
 		logs.Logger.Debug("([MESSAGE]  to id=", id, " plat=", plat, " Tid=", sendMsg.Tid)
 		if err := p.write(sess.conn, buf); err != nil {
+			logs.Logger.Error("MESSAGE write error:", err)
+			if plat != protocol.PLAT_WEB {
+				p.store.SaveImMsg(id, plat, []byte(msg.Msg))
+			}
+		} else {
 			//创建事务并保存
 			trans := newTransaction()
 			trans.tid = int(sendMsg.Tid)
@@ -187,11 +191,6 @@ func (p *Comet) message(msg *rpc.PushRequst) {
 			trans.msg = append(trans.msg, []byte(msg.Msg)...) //mem leak
 			sess.saveTransaction(trans)
 			sess.checkTrans(trans)
-		} else {
-			logs.Logger.Error("MESSAGE write error:", err)
-			if plat != protocol.PLAT_WEB {
-				p.store.SaveImMsg(id, plat, []byte(msg.Msg))
-			}
 		}
 	} else {
 		if plat != protocol.PLAT_WEB {

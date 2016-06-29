@@ -36,19 +36,21 @@ func (p *Router) RpcAsyncHandle(request interface{}) {
 				//online
 				s := p.pool.findSessions(msg.Id)
 				if s != nil {
+					logs.Logger.Debug("StateNotify Find SESSION=", s)
 					s.cometId = msg.CometId
 					var find bool
 					for _, v := range s.item {
 						if v.plat == msg.Termtype {
+							logs.Logger.Debug("StateNotify Find ITEM=", v)
 							find = true
 							v.online = true
 						}
 					}
 					if !find {
-						var i item
-						i.online = true
-						i.plat = msg.Termtype
-						s.item = append(s.item, i)
+						var it item
+						it.online = true
+						it.plat = msg.Termtype
+						s.item = append(s.item, &it)
 					}
 					p.pool.cometAdd(s.cometId)
 				} /* else {
