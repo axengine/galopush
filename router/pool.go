@@ -37,6 +37,7 @@ type comet struct {
 	tcpAddr   string         //comet对外开放tcp服务地址
 	wsAddr    string         //comet对外开放ws服务地址
 	online    int            //comet在线统计
+	ch        chan int       //comet rpc 状态通知chan
 }
 
 func (p *Pool) insertComet(id string, c *comet) {

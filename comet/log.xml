@@ -9,10 +9,9 @@
         </filter>		
         <filter levels="critical">
             <file path="./log/rootLogger_CRTL.log" formatid="main"/>
-			<!--
-            <smtp formatid="criticalemail" senderaddress="ligang@ccsuntel.com" sendername="dft" hostname="smtp.exmail.qq.com" hostport="25" username="ligang@ccsuntel.com" password="axengine100200">
-                <recipient address="ligang@suntel.com.cn"/>
-            </smtp>-->
+            <smtp formatid="criticalemail" senderaddress="ligang@ccsuntel.com" sendername="comet" hostname="smtp.exmail.qq.com" hostport="25" username="ligang@ccsuntel.com" password="axengine100200">
+                <recipient address="axengine@163.com"/>
+            </smtp>
         </filter>
     </outputs>
     <formats>

@@ -15,7 +15,7 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 		}
 	}()
 	b := i.([]byte)
-	logs.Logger.Debug("[nsq] topic=", topic, " msg=", string(b[:]))
+	logs.Logger.Info("[nsq] topic=", topic, " msg=", string(b[:]))
 
 	switch topic {
 	case p.topics[0]: //userOnlineState
@@ -34,12 +34,12 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 					//找到对应终端类型
 					if v.plat == msg.Termtype {
 						find = true
-						logs.Logger.Debug("userOnlineState Find Item=", v)
+						logs.Logger.Debug("UserState Find Item=", v)
 						if v.login == true && msg.Login == true {
 							//踢人
 							c := p.pool.findComet(sess.cometId)
 							if c != nil {
-								logs.Logger.Debug("userOnlineState Kick id=", sess.id, " palt=", v.plat)
+								logs.Logger.Debug("UserState Kick Because repeat login id=", sess.id, " palt=", v.plat)
 								c.rpcClient.Kick(sess.id, v.plat)
 							}
 						}
@@ -51,7 +51,7 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 							//踢人
 							c := p.pool.findComet(sess.cometId)
 							if c != nil {
-								logs.Logger.Debug("userOnlineState Kick id=", sess.id, " palt=", v.plat)
+								logs.Logger.Debug("UserState Kick Because unlogin id=", sess.id, " palt=", v.plat)
 								c.rpcClient.Kick(sess.id, v.plat)
 							}
 						}
@@ -62,7 +62,7 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 								//踢人
 								c := p.pool.findComet(sess.cometId)
 								if c != nil {
-									logs.Logger.Debug("userOnlineState Kick id=", sess.id, " palt=", v.plat)
+									logs.Logger.Debug("UserState Kick Because mutex id=", sess.id, " palt=", v.plat)
 									c.rpcClient.Kick(sess.id, v.plat)
 								}
 							}
@@ -78,7 +78,7 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 					it.deviceToken = msg.DeviceToken
 					it.login = msg.Login
 					sess.item = append(sess.item, &it)
-					logs.Logger.Debug("userOnlineState New Item=", it)
+					logs.Logger.Debug("UserState New Item=", it)
 				}
 			} else {
 				//没有找到session
@@ -91,7 +91,7 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 				it.login = msg.Login
 				sess.item = append(sess.item, &it)
 				p.pool.insertSessions(msg.Uid, sess)
-				logs.Logger.Debug("userOnlineState New session ", sess)
+				logs.Logger.Debug("UserState New session ", msg.Uid, " item=", it)
 			}
 		}
 	case p.topics[1], p.topics[2], p.topics[3]: //push callback message
@@ -128,6 +128,7 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 							}
 						}
 					} else {
+						logs.Logger.Debug("Push Failed comet offline comet=", sess.cometId)
 						//comet offline need save msg
 						for _, it := range sess.item {
 							if it.plat&receiver.Termtype > 0 {
@@ -137,6 +138,8 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 							}
 						}
 					}
+				} else {
+					logs.Logger.Debug("Push Failed not find session id=", receiver.Uid)
 				}
 			}
 		}

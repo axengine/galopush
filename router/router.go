@@ -9,13 +9,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/widuu/goini"
 )
-
-var Debug = logs.Logger.Debug
-var Error = logs.Logger.Error
-var Critical = logs.Logger.Critical
 
 type Router struct {
 	//rpc服务
@@ -45,13 +42,13 @@ type Router struct {
 
 func (p *Router) Init() {
 	conf := goini.SetConfig("./config.ini")
-	Debug("--------OnInit--------")
+	logs.Logger.Debug("--------OnInit--------")
 	//RPC
 	{
 		p.routerRpcAddr = conf.GetValue("router", "rpcAddr")
 		s := conf.GetValue("router", "rpcServerCache")
 		p.maxRpcInFight, _ = strconv.Atoi(s)
-		Debug("----router rpc addr=", p.routerRpcAddr, " cache=", p.maxRpcInFight)
+		logs.Logger.Debug("----router rpc addr=", p.routerRpcAddr, " cache=", p.maxRpcInFight)
 	}
 
 	//NSQ
@@ -61,13 +58,13 @@ func (p *Router) Init() {
 		s = conf.GetValue("nsq", "topics")
 		p.topics = strings.Split(s, ",")
 		p.nsqdTcpAddr = conf.GetValue("nsq", "tcpAddr")
-		Debug("----nsqd nsqlookup addr=", p.nsqlookupAddr, " topics=", p.topics)
+		logs.Logger.Debug("----nsqd nsqlookup addr=", p.nsqlookupAddr, " topics=", p.topics)
 	}
 
 	//HTTP
 	{
 		p.httpBindAddr = conf.GetValue("http", "bindAddr")
-		Debug("----http addr=", p.httpBindAddr, " cache=", p.maxRpcInFight)
+		logs.Logger.Debug("----http addr=", p.httpBindAddr, " cache=", p.maxRpcInFight)
 	}
 
 	p.cometExit = make(chan string)
@@ -87,16 +84,19 @@ func (p *Router) Init() {
 			database = 0
 		}
 		p.store = redisstore.NewStorager(dbconn, password, database)
-		Debug("----redis addr=", dbconn, " password:", password, " database:", database)
+		logs.Logger.Debug("----redis addr=", dbconn, " password:", password, " database:", database)
 	}
 
-	Debug("--------Init success--------")
+	//开启统计输出
+	go p.stat()
+
+	logs.Logger.Debug("--------Init success--------")
 }
 
 func (p *Router) Start() {
 	defer func() {
 		if r := recover(); r != nil {
-			logs.Logger.Error("Start.recover:", r)
+			logs.Logger.Critical("Start.recover:", r)
 			go p.Start()
 		}
 	}()
@@ -122,7 +122,7 @@ func (p *Router) Start() {
 
 	p.startHttpServer()
 
-	Debug("--------Start Router success--------")
+	logs.Logger.Debug("--------Start Router success--------")
 }
 
 func (p *Router) Stop() error {
@@ -132,11 +132,21 @@ func (p *Router) Stop() error {
 }
 
 //newRpcClient 返回一个RPC客户端
-func (p *Router) NewRpcClient(addr string) (*rpc.RpcClient, error) {
-	c, err := rpc.NewRpcClient(addr)
+func (p *Router) NewRpcClient(name, addr string, ch chan int) (*rpc.RpcClient, error) {
+	c, err := rpc.NewRpcClient(name, addr, ch)
 	if err != nil {
 		logs.Logger.Error("NewRpcClient ", err)
 		return c, err
 	}
 	return c, err
+}
+
+func (p *Router) stat() {
+	t := time.NewTicker(time.Second * 60)
+	for {
+		select {
+		case <-t.C:
+			logs.Logger.Debug("Registered ", len(p.pool.comets), " comets with ", len(p.pool.sessions), " sessions")
+		}
+	}
 }

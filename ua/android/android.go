@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	android_uid          = "13996130360"
-	token                = "000000"
+	android_uid          = "8"
+	token                = "d73d89472cdb13a1cdf79a55bccbbd56"
 	gencode              = protocol.ENCODE_LOOP_XOR
 	loadblancer          = "http://192.168.1.63:5150/v1/gComet.addr"
 	default_read_timeout = 5

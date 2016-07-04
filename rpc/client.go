@@ -9,15 +9,19 @@ import (
 )
 
 type RpcClient struct {
+	id         string //用来标识RPC客户端
 	serverAddr string
 	mutex      sync.Mutex
 	rpcClient  *rpc.Client
+	status     chan int //1-success 0-failed
 }
 
 //NewClient return a *Client wicth contant a rpc.handle
-func NewRpcClient(serverAddr string) (*RpcClient, error) {
+func NewRpcClient(id, serverAddr string, stateChan chan int) (*RpcClient, error) {
 	var client RpcClient
+	client.id = id
 	client.serverAddr = serverAddr
+	client.status = stateChan
 
 	var cli *rpc.Client
 	var err error
@@ -26,6 +30,7 @@ func NewRpcClient(serverAddr string) (*RpcClient, error) {
 		return &client, err
 	}
 	client.rpcClient = cli
+	client.status <- 1
 	return &client, err
 }
 
@@ -39,13 +44,14 @@ func (p *RpcClient) connect() error {
 	return err
 }
 
-func (p *RpcClient) reConnect() error {
+func (p *RpcClient) ReConnect() error {
 	//先关闭旧连接
 	p.rpcClient.Close()
 
 	var err error
 	if err = p.connect(); err == nil {
 		logs.Logger.Debug("connect to rpc server ", p.serverAddr, "success")
+		p.status <- 1
 		return nil
 	}
 	return err
@@ -56,7 +62,7 @@ func (p *RpcClient) Close() error {
 }
 
 //StartPing start heartbeat with the ticker 30 s
-func (p *RpcClient) StartPing(exit chan string, cometId string) {
+func (p *RpcClient) StartPing() {
 	go func(client *RpcClient) {
 		tk := time.NewTicker(time.Second * 30)
 		for {
@@ -65,12 +71,8 @@ func (p *RpcClient) StartPing(exit chan string, cometId string) {
 				err := client.Ping()
 				if err != nil {
 					logs.Logger.Error("[rpc]ping rpc server err ", err, " server addr  ", client.serverAddr)
-					err := client.reConnect()
-					if err != nil {
-						logs.Logger.Error("[rpc]reconnect to rpc server err ", err, " addr  ", client.serverAddr, " exit ping runtime")
-						exit <- cometId
-						return
-					}
+					p.status <- 0
+					return
 				}
 			}
 		}
