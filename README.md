@@ -7,7 +7,6 @@ comet与终端（已定义Android、iOS、winPhone、web、PCClient等）之间�
 协议
 ------------
 ```
----------------------------
 	bit        7        6        5        4        3        2        1       0
 	byte1	EnCode(2bit)	Message-Type(6bit)
 	byte2	Transaction  ID(4bytes)
