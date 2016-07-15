@@ -30,7 +30,9 @@ const (
 	MSGTYPE_CBRESP    = 8
 	MSGTYPE_MESSAGE   = 9
 	MSGTYPE_MSGRESP   = 10
-	MSGTYPE_MAX       = 11
+	MSGTYPE_KICK      = 11
+	MSGTYPE_KICKRESP  = 12
+	MSGTYPE_MAX       = 64
 )
 
 //终端类型枚举
@@ -57,6 +59,12 @@ const (
 	FIX_HEADER_LEN = 5                               //固定头
 	ADD_HEADER_LEN = 4                               //可变头
 	HEADER_LEN     = FIX_HEADER_LEN + ADD_HEADER_LEN //全头
+)
+
+const (
+	KICK_REASON_REPEAT  = 1
+	KICK_REASON_MUTEX   = 2
+	KICK_REASON_TIMEOUT = 3
 )
 
 //fix head part
@@ -88,7 +96,6 @@ type ParamReg struct {
 type ParamPush struct {
 	Offline uint16
 	Flag    uint8
-	//Content []byte
 }
 
 // 0:about publice response
@@ -111,13 +118,30 @@ type Push struct {
 	ParamPush
 	Msg []byte
 }
+
+type Kick struct {
+	Header
+	AddHeader
+	Reason uint8
+}
+
 type Callback struct {
 	Header
 	AddHeader
 	Msg []byte
 }
-type Im struct {
+
+//即时消息上行
+type ImUp struct {
 	Header
 	AddHeader
 	Msg []byte
+}
+
+//即时消息下行
+type ImDown struct {
+	Header
+	AddHeader
+	Flag uint8
+	Msg  []byte
 }

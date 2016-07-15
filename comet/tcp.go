@@ -130,6 +130,11 @@ func (p *Comet) handleTcpConn(conn *net.TCPConn) {
 			return
 		}
 		switch msgType {
+		case protocol.MSGTYPE_KICKRESP:
+			//读取body 直接丢弃
+			if _, err = p.readTimeout(conn, ah.Len, default_read_timeout); err != nil {
+				return
+			}
 		//应答
 		case protocol.MSGTYPE_PUSHRESP, protocol.MSGTYPE_CBRESP, protocol.MSGTYPE_MSGRESP:
 			//读取body
@@ -186,7 +191,7 @@ func (p *Comet) handleTcpConn(conn *net.TCPConn) {
 			//解密
 			protocol.CodecDecode(buffer, int(ah.Len), protocol.GetEncode(h))
 
-			var msg protocol.Im
+			var msg protocol.ImUp
 			msg.Header = *h
 			msg.AddHeader = *ah
 			msg.Msg = buffer

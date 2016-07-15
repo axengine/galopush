@@ -168,13 +168,23 @@ func packBinary(data interface{}) []byte {
 		b4 := bigEndian(msg.Msg)
 		buf = append(buf, b4...)
 		CodecEncode(buf[HEADER_LEN:], int(msg.Len), GetEncode(&msg.Header))
-	case *Im:
-		msg := data.(*Im)
+	case *ImDown:
+		msg := data.(*ImDown)
 		b1 := bigEndian(msg.Header)
 		buf = append(buf, b1...)
 		b2 := bigEndian(msg.AddHeader)
 		buf = append(buf, b2...)
-
+		b3 := bigEndian(msg.Flag)
+		buf = append(buf, b3...)
+		b4 := bigEndian(msg.Msg)
+		buf = append(buf, b4...)
+		CodecEncode(buf[HEADER_LEN:], int(msg.Len), GetEncode(&msg.Header))
+	case *ImUp:
+		msg := data.(*ImUp)
+		b1 := bigEndian(msg.Header)
+		buf = append(buf, b1...)
+		b2 := bigEndian(msg.AddHeader)
+		buf = append(buf, b2...)
 		b4 := bigEndian(msg.Msg)
 		buf = append(buf, b4...)
 		CodecEncode(buf[HEADER_LEN:], int(msg.Len), GetEncode(&msg.Header))
@@ -186,6 +196,16 @@ func packBinary(data interface{}) []byte {
 		buf = append(buf, b2...)
 
 		b3 := bigEndian(msg.Code)
+		buf = append(buf, b3...)
+		CodecEncode(buf[HEADER_LEN:], int(msg.Len), GetEncode(&msg.Header))
+	case *Kick:
+		msg := data.(*Kick)
+		b1 := bigEndian(msg.Header)
+		buf = append(buf, b1...)
+		b2 := bigEndian(msg.AddHeader)
+		buf = append(buf, b2...)
+
+		b3 := bigEndian(msg.Reason)
 		buf = append(buf, b3...)
 		CodecEncode(buf[HEADER_LEN:], int(msg.Len), GetEncode(&msg.Header))
 	case *Header:

@@ -26,6 +26,7 @@ type Router struct {
 	nsqlookupAddr []string
 	nsqdTcpAddr   string
 	producer      *nsq.Producer //nsq生产者
+	upMsgTopic    string
 
 	//负载路由
 	httpBindAddr string
@@ -58,7 +59,8 @@ func (p *Router) Init() {
 		s = conf.GetValue("nsq", "topics")
 		p.topics = strings.Split(s, ",")
 		p.nsqdTcpAddr = conf.GetValue("nsq", "tcpAddr")
-		logs.Logger.Debug("----nsqd nsqlookup addr=", p.nsqlookupAddr, " topics=", p.topics)
+		p.upMsgTopic = conf.GetValue("nsq", "upMsgTopic")
+		logs.Logger.Debug("----nsqd nsqlookup addr=", p.nsqlookupAddr, " topics=", p.topics, " upMsgTopic=", p.upMsgTopic)
 	}
 
 	//HTTP

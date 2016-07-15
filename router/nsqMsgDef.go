@@ -19,6 +19,13 @@ type UserOnlineState struct {
 	Login       bool   `json:"online"`
 }
 
+type SessionTimeout struct {
+	Termtype int    `json:"ctype"`
+	Uid      string `json:"sessionId"`
+	Topic    string `json:"key"`
+	Flag     bool   `json:"flag"`
+}
+
 type MsgDownward struct {
 	Receivers []Receiver `json:"receivers"`
 	Body      string     `json:"body"`

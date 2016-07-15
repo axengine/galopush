@@ -145,7 +145,7 @@ func (p *Comet) unMarshal(conn *websocket.Conn, buffer []byte) error {
 		msg.Code = param.Code
 		p.Cache(conn, &msg)
 	case protocol.MSGTYPE_MESSAGE:
-		var msg protocol.Im
+		var msg protocol.ImUp
 		//固定头
 		protocol.SetMsgType(&msg.Header, data.Cmd)
 		protocol.SetEncode(&msg.Header, data.EnCode)

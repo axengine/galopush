@@ -155,10 +155,11 @@ func (p *RpcClient) MsgUpward(id string, termtype int, msg string) error {
 }
 
 //Kick 踢人下线
-func (p *RpcClient) Kick(id string, termtype int) error {
+func (p *RpcClient) Kick(id string, termtype, reason int) error {
 	var request KickRequst
 	request.Id = id
 	request.Termtype = termtype
+	request.Reason = reason
 
 	var respone Response
 

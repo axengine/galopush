@@ -28,6 +28,10 @@ type JsonResp struct {
 	Code int `json:"code"`
 }
 
+type JsonKick struct {
+	Reason int `json:"reason"`
+}
+
 func packJson(data interface{}) []byte {
 	var buf []byte
 	switch data.(type) {
@@ -81,8 +85,8 @@ func packJson(data interface{}) []byte {
 		//将整体消息编码为json
 		buf, _ := marshal(&data)
 		return buf
-	case *Im:
-		msg := data.(*Im)
+	case *ImDown:
+		msg := data.(*ImDown)
 		var data JsonData
 		data.Cmd = GetMsgType(&msg.Header)
 		data.EnCode = GetEncode(&msg.Header)
@@ -126,7 +130,26 @@ func packJson(data interface{}) []byte {
 		}
 		buf, _ := marshal(&data)
 		return buf
+	case *Kick:
+		msg := data.(*Kick)
+		var data JsonData
+		data.Cmd = GetMsgType(&msg.Header)
+		data.EnCode = GetEncode(&msg.Header)
+		data.Tid = int(msg.Tid)
 
+		var param JsonKick
+		param.Reason = int(msg.Reason)
+		b, _ := json.Marshal(&param)
+		CodecEncode(b, len(b), data.EnCode)
+
+		//消息体再base64加密
+		if data.EnCode > 0 {
+			data.Data = base64.StdEncoding.EncodeToString(b)
+		} else {
+			data.Data = string(b[:])
+		}
+		buf, _ := marshal(&data)
+		return buf
 	default:
 	}
 

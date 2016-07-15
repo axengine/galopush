@@ -36,12 +36,11 @@ func (p *Router) RpcAsyncHandle(request interface{}) {
 				//online
 				s := p.pool.findSessions(msg.Id)
 				if s != nil {
-					logs.Logger.Debug("StateNotify Find SESSION=", s)
 					s.cometId = msg.CometId
 					var find bool
 					for _, v := range s.item {
 						if v.plat == msg.Termtype {
-							logs.Logger.Debug("StateNotify Find ITEM=", v)
+							logs.Logger.Debug("StateNotify Find session uid=", s.id, " comet=", s.cometId, " item=", v)
 							find = true
 							v.online = true
 						}
@@ -95,13 +94,16 @@ func (p *Router) RpcSyncHandle(request interface{}) int {
 			}
 			for _, v := range sess.item {
 				//业务层已登录 终端类型相同 鉴权码相同
-				if v.plat == msg.Termtype && v.authCode == msg.Code && v.login == true {
-					code = rpc.RPC_RET_SUCCESS
-					logs.Logger.Debug("[rpc] Auth success id=", msg.Id, " termtype=", msg.Termtype, " code=", msg.Code)
-					return code
+				if v.plat == msg.Termtype {
+					if v.authCode == msg.Code && v.login == true {
+						code = rpc.RPC_RET_SUCCESS
+						logs.Logger.Debug("[rpc] Auth success id=", msg.Id, " termtype=", msg.Termtype, " code=", msg.Code)
+						return code
+					} else {
+						logs.Logger.Debug("[rpc] Auth Failed Error Code or state id=", msg.Id, " item=", v)
+					}
 				}
 			}
-			logs.Logger.Debug("[rpc] Auth Failed Error Code or state id=", msg.Id, " sess=", sess.item)
 		}
 	case *rpc.CometRegister:
 		{
@@ -155,9 +157,9 @@ func (p *Router) RpcSyncHandle(request interface{}) int {
 			b, _ := json.Marshal(&upMsg)
 
 			//发送到NSQ
-			logs.Logger.Debug(b)
-			if err := p.producer.Publish(p.topics[4], b); err != nil {
-				logs.Logger.Error("MsgUpwardRequst Failed ", err)
+			//logs.Logger.Debug(b)
+			if err := p.producer.Publish(p.upMsgTopic, b); err != nil {
+				logs.Logger.Error("MsgUpwardRequst Failed ", err, " msg=", msg.Msg)
 				return code
 			}
 			code = rpc.RPC_RET_SUCCESS

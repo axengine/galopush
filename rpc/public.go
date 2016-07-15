@@ -70,6 +70,13 @@ type MsgUpwardRequst struct {
 type KickRequst struct {
 	Id       string
 	Termtype int
+
+	/* added by liang @ 2016-07-11
+	0x01:重复登录，同终端类型客户端登录
+	0x02:互斥登录，Android/iOS互斥
+	0x03:session超时
+	*/
+	Reason int
 }
 
 /*推送请求

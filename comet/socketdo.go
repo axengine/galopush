@@ -53,8 +53,8 @@ func (p *Comet) procTrans(data interface{}) {
 		push := msg.(*protocol.Resp)
 		p.procResp(conn, push)
 		//即时消息
-	case *protocol.Im:
-		push := msg.(*protocol.Im)
+	case *protocol.ImUp:
+		push := msg.(*protocol.ImUp)
 		p.procIm(conn, push)
 	}
 }
@@ -110,6 +110,13 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 	//上报到router
 	p.rpcCli.Notify(id, p.cometId, rpc.STATE_ONLINE, plat)
 
+	//判断web是否在线
+	iWebOnline := 0
+	idWeb := fmt.Sprintf("%s-%d", id, protocol.PLAT_WEB)
+	if sWeb := p.pool.findSessions(idWeb); sWeb != nil {
+		iWebOnline = 1
+	}
+
 	//离线消息处理
 	switch plat {
 	case protocol.PLAT_ANDROID:
@@ -123,10 +130,10 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 			sendMsg.Len = uint32(len(buff) + 3)
 			sendMsg.Msg = append(sendMsg.Msg, buff...)
 			sendMsg.Offline = offCount
-			sendMsg.Flag = 1
+			sendMsg.Flag = uint8(iWebOnline)
 
 			buf := protocol.Pack(&sendMsg, protocol.PROTOCOL_TYPE_BINARY)
-			logs.Logger.Debug("[on register] send offline push msg id=", id, " count=", offCount, " buff=", buff)
+			logs.Logger.Debug("[on register] send offline push msg id=", id, " count=", offCount, " buff=", buff, " flag=", iWebOnline)
 			if err := p.write(sess.conn, buf); err == nil {
 				//创建事务并保存
 				trans := newTransaction()
@@ -172,15 +179,16 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 		imBuffSlice := p.store.GetImMsg(id, plat)
 		for _, v := range imBuffSlice {
 			buff := v
-			var sendMsg protocol.Im
+			var sendMsg protocol.ImDown
 			protocol.SetMsgType(&sendMsg.Header, protocol.MSGTYPE_MESSAGE)
 			protocol.SetEncode(&sendMsg.Header, sess.encode)
 			sendMsg.Tid = uint32(sess.nextTid())
-			sendMsg.Len = uint32(len(buff))
+			sendMsg.Len = uint32(len(buff) + 1)
+			sendMsg.Flag = uint8(iWebOnline)
 			sendMsg.Msg = append(sendMsg.Msg, buff...)
 
 			buf := protocol.Pack(&sendMsg, protocol.PROTOCOL_TYPE_BINARY)
-			logs.Logger.Debug("[on register] send offline callback msg id=", id, " msg=", buff)
+			logs.Logger.Debug("[on register] send offline callback msg id=", id, " msg=", buff, " flag=", iWebOnline)
 			if err := p.write(sess.conn, buf); err == nil {
 				//创建事务并保存
 				trans := newTransaction()
@@ -227,15 +235,16 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 		imBuffSlice := p.store.GetImMsg(id, plat)
 		for _, v := range imBuffSlice {
 			buff := v
-			var sendMsg protocol.Im
+			var sendMsg protocol.ImDown
 			protocol.SetMsgType(&sendMsg.Header, protocol.MSGTYPE_MESSAGE)
 			protocol.SetEncode(&sendMsg.Header, sess.encode)
 			sendMsg.Tid = uint32(sess.nextTid())
-			sendMsg.Len = uint32(len(buff))
+			sendMsg.Len = uint32(len(buff) + 1)
+			sendMsg.Flag = uint8(iWebOnline)
 			sendMsg.Msg = append(sendMsg.Msg, buff...)
 
 			buf := protocol.Pack(&sendMsg, protocol.PROTOCOL_TYPE_BINARY)
-			logs.Logger.Debug("[on register] send offline im msg id=", id, " msg=", buff)
+			logs.Logger.Debug("[on register] send offline im msg id=", id, " msg=", buff, " flag=", iWebOnline)
 			if err := p.write(sess.conn, buf); err == nil {
 				//创建事务并保存
 				trans := newTransaction()
@@ -281,7 +290,7 @@ func (p *Comet) procUnRegister(conn interface{}) {
 }
 
 //procIm 处理用户IM即时消息
-func (p *Comet) procIm(conn interface{}, msg *protocol.Im) {
+func (p *Comet) procIm(conn interface{}, msg *protocol.ImUp) {
 	request := msg
 	msgType := protocol.GetMsgType(&request.Header)
 	encode := protocol.GetEncode(&request.Header)
@@ -302,7 +311,7 @@ func (p *Comet) procIm(conn interface{}, msg *protocol.Im) {
 	}
 	logs.Logger.Debug("[IM]   addr=", addr, " sess=", sess, " msg=", string(request.Msg[:]))
 
-	err := p.rpcCli.MsgUpward(id, sess.plat, string(request.Msg))
+	err := p.rpcCli.MsgUpward(sess.id, sess.plat, string(request.Msg))
 	if err != nil {
 		//应答
 		logs.Logger.Error("[IM]  publish to nsq err=", err, " addr=", addr, " sess=", sess)
@@ -358,7 +367,7 @@ func (p *Comet) response(conn interface{}, msgType int, encode int, tid uint32, 
 	resp.Len = uint32(binary.Size(resp.ParamResp))
 	resp.Code = code
 	buf := protocol.Pack(&resp, protocolType)
-	logs.Logger.Debug("send:", buf)
+	//logs.Logger.Debug("send:", buf)
 	return p.write(conn, buf)
 }
 
