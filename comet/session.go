@@ -104,7 +104,7 @@ func (p *session) checkTrans(t *transaction) {
 	if t.msgType != protocol.MSGTYPE_CALLBACK {
 		t.timer = time.NewTimer(time.Second * 5)
 	} else {
-		t.timer = time.NewTimer(time.Second * 300)
+		t.timer = time.NewTimer(time.Second * 60)
 	}
 	go func() {
 		for {

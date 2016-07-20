@@ -20,10 +20,11 @@ type UserOnlineState struct {
 }
 
 type SessionTimeout struct {
-	Termtype int    `json:"ctype"`
-	Uid      string `json:"sessionId"`
-	Topic    string `json:"key"`
-	Flag     bool   `json:"flag"`
+	Termtype  int    `json:"ctype"`
+	Uid       string `json:"uid"`
+	SessionId string `json:"sessionId"`
+	Topic     string `json:"key"`
+	Flag      bool   `json:"flag"`
 }
 
 type MsgDownward struct {

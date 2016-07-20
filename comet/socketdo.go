@@ -133,7 +133,7 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 			sendMsg.Flag = uint8(iWebOnline)
 
 			buf := protocol.Pack(&sendMsg, protocol.PROTOCOL_TYPE_BINARY)
-			logs.Logger.Debug("[on register] send offline push msg id=", id, " count=", offCount, " buff=", buff, " flag=", iWebOnline)
+			logs.Logger.Debug("[on register] send offline push msg id=", id, " count=", offCount, " buff=", string(buff), " flag=", iWebOnline)
 			if err := p.write(sess.conn, buf); err == nil {
 				//创建事务并保存
 				trans := newTransaction()
@@ -160,7 +160,7 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 			sendMsg.Msg = append(sendMsg.Msg, buff...)
 
 			buf := protocol.Pack(&sendMsg, protocol.PROTOCOL_TYPE_BINARY)
-			logs.Logger.Debug("[on register] send offline callback msg id=", id, " msg=", buff)
+			logs.Logger.Debug("[on register] send offline callback msg id=", id, " msg=", string(buff))
 			if err := p.write(sess.conn, buf); err == nil {
 				//创建事务并保存
 				trans := newTransaction()
@@ -188,7 +188,7 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 			sendMsg.Msg = append(sendMsg.Msg, buff...)
 
 			buf := protocol.Pack(&sendMsg, protocol.PROTOCOL_TYPE_BINARY)
-			logs.Logger.Debug("[on register] send offline callback msg id=", id, " msg=", buff, " flag=", iWebOnline)
+			logs.Logger.Debug("[on register] send offline callback msg id=", id, " msg=", string(buff), " flag=", iWebOnline)
 			if err := p.write(sess.conn, buf); err == nil {
 				//创建事务并保存
 				trans := newTransaction()
@@ -216,7 +216,7 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 			sendMsg.Msg = append(sendMsg.Msg, buff...)
 
 			buf := protocol.Pack(&sendMsg, protocol.PROTOCOL_TYPE_BINARY)
-			logs.Logger.Debug("[on register] send offline callback msg id=", id, " msg=", buff)
+			logs.Logger.Debug("[on register] send offline callback msg id=", id, " msg=", string(buff))
 			if err := p.write(sess.conn, buf); err == nil {
 				//创建事务并保存
 				trans := newTransaction()
@@ -244,7 +244,7 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 			sendMsg.Msg = append(sendMsg.Msg, buff...)
 
 			buf := protocol.Pack(&sendMsg, protocol.PROTOCOL_TYPE_BINARY)
-			logs.Logger.Debug("[on register] send offline im msg id=", id, " msg=", buff, " flag=", iWebOnline)
+			logs.Logger.Debug("[on register] send offline im msg id=", id, " msg=", string(buff), " flag=", iWebOnline)
 			if err := p.write(sess.conn, buf); err == nil {
 				//创建事务并保存
 				trans := newTransaction()
@@ -351,10 +351,10 @@ func (p *Comet) procResp(conn interface{}, msg *protocol.Resp) {
 			trans.timer.Stop()
 			trans.exit <- 1
 		} else {
-			logs.Logger.Error("[resp] connoet find trans type=", protocol.GetMsgType(&msg.Header), " addr=", addr, " id=", id, " tid=", msg.Tid)
+			logs.Logger.Error("[resp] connot find trans type=", protocol.GetMsgType(&msg.Header), " addr=", addr, " id=", id, " tid=", msg.Tid)
 		}
 	} else {
-		logs.Logger.Error("[resp] connoet find session type=", protocol.GetMsgType(&msg.Header), " addr=", addr, " id=", id)
+		logs.Logger.Error("[resp] connot find session type=", protocol.GetMsgType(&msg.Header), " addr=", addr, " id=", id)
 	}
 }
 

@@ -52,7 +52,7 @@ func (p *Comet) closeConn(conn interface{}) {
 
 func (p *Comet) write(conn interface{}, buf []byte) error {
 	var err error
-	logs.Logger.Debug("[send]", buf)
+	//logs.Logger.Debug("[send]", buf)
 	switch conn.(type) {
 	case *net.TCPConn:
 		c := conn.(*net.TCPConn)
@@ -85,7 +85,7 @@ func (p *Comet) readTimeout(conn *net.TCPConn, len uint32, timeout int) (buffer 
 		logs.Logger.Error(conn.RemoteAddr().String(), " connection Read error: ", err)
 	}
 
-	logs.Logger.Debug("[conn]read data:", buffer)
+	//logs.Logger.Debug("[conn]read data:", buffer)
 	return
 }
 

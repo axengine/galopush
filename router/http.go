@@ -47,7 +47,7 @@ func (p *Router) loadDispatcher(w http.ResponseWriter, r *http.Request) {
 		plat = protocol.PLAT_PC
 	}
 	addr := p.balancer(id, plat)
-	logs.Logger.Debug("[http] load dispatcher id=", id, " plat=", platS, " addr=", addr)
+	logs.Logger.Debug("[http] load dispatcher id=", id, " plat=", platS, " addr=", addr, " remote=", r.RemoteAddr)
 
 	//for ajax cross domain
 	Origin := r.Header.Get("Origin")

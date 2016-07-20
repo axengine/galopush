@@ -1,6 +1,7 @@
 package nsq
 
 import (
+	"encoding/base64"
 	"log"
 
 	"github.com/nsqio/go-nsq"
@@ -72,7 +73,13 @@ func NewDispatcher(topic string, handle func(string, interface{})) *Dispatcher {
 }
 
 func (p *Dispatcher) HandleMessage(msg *nsq.Message) error {
-	p.handle(p.topic, msg.Body)
+	body, err := base64.StdEncoding.DecodeString(string(msg.Body[:]))
+	if err != nil {
+		log.Println("err=", err, " topic=", p.topic, " msg=", string(msg.Body))
+		p.handle(p.topic, msg.Body)
+		return nil
+	}
+	p.handle(p.topic, body)
 	return nil
 }
 
@@ -94,5 +101,6 @@ func NewProducer(destNsqdTCPAddrs string) (*Producer, error) {
 }
 
 func (p *Producer) Publish(topic string, msg []byte) error {
-	return p.producer.Publish(topic, msg)
+	m := base64.StdEncoding.EncodeToString(msg)
+	return p.producer.Publish(topic, []byte(m))
 }

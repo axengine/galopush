@@ -1,9 +1,9 @@
 package main
 
 import (
-	"encoding/base64"
+	//	"encoding/base64"
 	"encoding/json"
-	"errors"
+	//	"errors"
 	"galopush/logs"
 	"galopush/protocol"
 	"net/http"
@@ -45,7 +45,7 @@ func (p *Comet) handlerWsconn(conn *websocket.Conn) {
 			logs.Logger.Debug("websocket.Message.Receive error=", err)
 			return
 		}
-
+		logs.Logger.Debug("ws receive ", string(buf))
 		if err = p.unMarshal(conn, buf); err != nil {
 			logs.Logger.Error("protocol.DecodeJson error=", err, " buf=", string(buf[:]))
 			return
@@ -57,122 +57,75 @@ func (p *Comet) handlerWsconn(conn *websocket.Conn) {
 //让业务处理模块能对tcp/ws一致性处理
 //返回值:error
 func (p *Comet) unMarshal(conn *websocket.Conn, buffer []byte) error {
-	var data protocol.JsonData
-	if err := json.Unmarshal(buffer, &data); err != nil {
+	var body map[string]interface{}
+	if err := json.Unmarshal(buffer, &body); err != nil {
+		logs.Logger.Error(err, " msg=", string(buffer))
 		return err
 	}
-
-	switch data.Cmd {
+	cmd := int(body["cmd"].(float64))
+	tid := int(body["tid"].(float64))
+	data := body["data"].(map[string]interface{})
+	switch cmd {
 	case protocol.MSGTYPE_REGISTER:
-		var msg protocol.Register
+		{
+			var msg protocol.Register
+			protocol.SetMsgType(&msg.Header, cmd)
+			protocol.SetEncode(&msg.Header, 0)
+			msg.Tid = uint32(tid)
+			msg.Len = 66
 
-		//固定头
-		protocol.SetMsgType(&msg.Header, data.Cmd)
-		protocol.SetEncode(&msg.Header, data.EnCode)
-		msg.Tid = uint32(data.Tid)
-
-		//可变头
-		msg.Len = 66
-
-		//解析消息体
-
-		//将消息体转为字符数组
-		var b []byte
-		if data.EnCode > 0 {
-			b, _ = base64.StdEncoding.DecodeString(data.Data)
-		} else {
-			b = []byte(data.Data)
+			//消息体
+			msg.Version = byte(data["version"].(float64))
+			msg.TerminalType = byte(data["termType"].(float64))
+			idBuff := []byte(data["id"].(string))
+			for i := 0; i < 32 && i < len(idBuff); i++ {
+				msg.Id[i] = idBuff[i]
+			}
+			tokenBuff := []byte(data["token"].(string))
+			for i := 0; i < 32 && i < len(tokenBuff); i++ {
+				msg.Token[i] = tokenBuff[i]
+			}
+			p.Cache(conn, &msg)
 		}
-
-		//对消息体进行解密
-		protocol.CodecDecode(b, len(b), data.EnCode)
-
-		//将消息体还原为二进制结构
-		var param protocol.JsonRegiter
-		if err := json.Unmarshal(b, &param); err != nil {
-			return err
-		}
-
-		//消息体
-		msg.Version = byte(param.Version)
-		msg.TerminalType = byte(param.TerminalType)
-		idBuff := []byte(param.Id)
-		for i := 0; i < 32 && i < len(idBuff); i++ {
-			msg.Id[i] = idBuff[i]
-		}
-		tokenBuff := []byte(param.Token)
-		for i := 0; i < 32 && i < len(tokenBuff); i++ {
-			msg.Token[i] = tokenBuff[i]
-		}
-		p.Cache(conn, &msg)
 	case protocol.MSGTYPE_HEARTBEAT:
-		var msg protocol.Header
-
-		//固定头
-		protocol.SetMsgType(&msg, data.Cmd)
-		protocol.SetEncode(&msg, data.EnCode)
-		msg.Tid = uint32(data.Tid)
-		p.Cache(conn, &msg)
-	case protocol.MSGTYPE_PUSHRESP, protocol.MSGTYPE_CBRESP, protocol.MSGTYPE_MSGRESP:
-		var msg protocol.Resp
-		//固定头
-		protocol.SetMsgType(&msg.Header, data.Cmd)
-		protocol.SetEncode(&msg.Header, data.EnCode)
-		msg.Tid = uint32(data.Tid)
-
-		//可变头
-		msg.Len = 1
-		//解析消息体
-
-		//将消息体转为字符数组
-		var b []byte
-		if data.EnCode > 0 {
-			b, _ = base64.StdEncoding.DecodeString(data.Data)
-		} else {
-			b = []byte(data.Data)
+		{
+			var msg protocol.Header
+			//固定头
+			protocol.SetMsgType(&msg, cmd)
+			protocol.SetEncode(&msg, 0)
+			msg.Tid = uint32(tid)
+			p.Cache(conn, &msg)
 		}
 
-		//对消息体进行解密
-		protocol.CodecDecode(b, len(b), data.EnCode)
+	case protocol.MSGTYPE_PUSHRESP, protocol.MSGTYPE_CBRESP, protocol.MSGTYPE_MSGRESP, protocol.MSGTYPE_KICKRESP:
+		{
+			var msg protocol.Resp
+			//固定头
+			protocol.SetMsgType(&msg.Header, cmd)
+			protocol.SetEncode(&msg.Header, 0)
+			msg.Tid = uint32(tid)
 
-		//将消息体还原为二进制结构
-		var param protocol.ParamResp
-		if err := json.Unmarshal(b, &param); err != nil {
-			return err
+			//可变头
+			msg.Len = 1
+			msg.Code = byte(data["code"].(float64))
+			p.Cache(conn, &msg)
 		}
-
-		//消息体
-		msg.Code = param.Code
-		p.Cache(conn, &msg)
 	case protocol.MSGTYPE_MESSAGE:
 		var msg protocol.ImUp
 		//固定头
-		protocol.SetMsgType(&msg.Header, data.Cmd)
-		protocol.SetEncode(&msg.Header, data.EnCode)
-		msg.Tid = uint32(data.Tid)
+		protocol.SetMsgType(&msg.Header, cmd)
+		protocol.SetEncode(&msg.Header, 0)
+		msg.Tid = uint32(tid)
 
-		//解析消息体
+		content := data["msg"].(string)
+		contentBuff := []byte(content)
 
-		//将消息体转为字符数组
-		var b []byte
-		if data.EnCode > 0 {
-			b, _ = base64.StdEncoding.DecodeString(data.Data)
-		} else {
-			b = []byte(data.Data)
-		}
+		msg.Len = uint32(len(contentBuff))
 
-		//附加头
-		msg.Len = uint32(len(b))
-
-		//对消息体进行解密
-		protocol.CodecDecode(b, len(b), data.EnCode)
-
-		//将消息体还原为二进制结构
-		msg.Msg = b
+		msg.Msg = append(msg.Msg, contentBuff...)
 
 		p.Cache(conn, &msg)
-	default:
-		return errors.New("error msg type")
 	}
+
 	return nil
 }

@@ -1,158 +1,71 @@
 package protocol
 
 import (
-	"encoding/base64"
+	//	"encoding/base64"
 	"encoding/json"
+	"galopush/logs"
 )
 
-type JsonData struct {
-	Cmd    int `json:"cmd"`
-	EnCode int `json:"enCode"`
-	Tid    int `json:"tid"`
-	//Data   interface{} `json:"data"`
-	Data string `json:"data"`
-}
-
-type JsonRegiter struct {
-	Version      int    `json:"version"`
-	TerminalType int    `json:"termType"`
-	Id           string `json:"id"`
-	Token        string `json:"token"`
-}
-
-type JsonPush struct {
-	Msg string `json:"msg"`
-}
-
-type JsonResp struct {
-	Code int `json:"code"`
-}
-
-type JsonKick struct {
-	Reason int `json:"reason"`
-}
-
-func packJson(data interface{}) []byte {
+func packJson(v interface{}) []byte {
 	var buf []byte
-	switch data.(type) {
+	var err error
+	var body map[string]interface{}
+	body = make(map[string]interface{})
+	var data map[string]interface{}
+	data = make(map[string]interface{})
+	switch v.(type) {
 	case *Push:
-		msg := data.(*Push)
-		var data JsonData
-		data.Cmd = GetMsgType(&msg.Header)
-		data.EnCode = GetEncode(&msg.Header)
-		data.Tid = int(msg.Tid)
-
-		//先把消息体编码为json
-		var param JsonPush
-		param.Msg = base64.StdEncoding.EncodeToString(msg.Msg)
-		b, _ := json.Marshal(&param)
-
-		//把消息体按照encode进行加密
-		CodecEncode(b, len(b), data.EnCode)
-
-		//消息体再base64加密
-		if data.EnCode > 0 {
-			data.Data = base64.StdEncoding.EncodeToString(b)
-		} else {
-			data.Data = string(b[:])
+		msg := v.(*Push)
+		body["cmd"] = GetMsgType(&msg.Header)
+		body["tid"] = msg.Tid
+		data["msg"] = string(msg.Msg)
+		body["data"] = data
+		buf, err = json.Marshal(&body)
+		if err != nil {
+			logs.Logger.Error(err)
 		}
-
-		//将整体消息编码为json
-		buf, _ := marshal(&data)
-		return buf
 	case *Callback:
-		msg := data.(*Callback)
-		var data JsonData
-		data.Cmd = GetMsgType(&msg.Header)
-		data.EnCode = GetEncode(&msg.Header)
-		data.Tid = int(msg.Tid)
-
-		//先把消息体编码为json
-		var param JsonPush
-		param.Msg = base64.StdEncoding.EncodeToString(msg.Msg)
-		b, _ := json.Marshal(&param)
-
-		//把消息体按照encode进行加密
-		CodecEncode(b, len(b), data.EnCode)
-
-		//消息体再base64加密
-		if data.EnCode > 0 {
-			data.Data = base64.StdEncoding.EncodeToString(b)
-		} else {
-			data.Data = string(b[:])
+		msg := v.(*Callback)
+		body["cmd"] = GetMsgType(&msg.Header)
+		body["tid"] = msg.Tid
+		data["msg"] = string(msg.Msg)
+		body["data"] = data
+		buf, err = json.Marshal(&body)
+		if err != nil {
+			logs.Logger.Error(err)
 		}
-
-		//将整体消息编码为json
-		buf, _ := marshal(&data)
-		return buf
 	case *ImDown:
-		msg := data.(*ImDown)
-		var data JsonData
-		data.Cmd = GetMsgType(&msg.Header)
-		data.EnCode = GetEncode(&msg.Header)
-		data.Tid = int(msg.Tid)
-
-		//先把消息体编码为json
-		var param JsonPush
-		param.Msg = base64.StdEncoding.EncodeToString(msg.Msg)
-		b, _ := json.Marshal(&param)
-
-		//把消息体按照encode进行加密
-		CodecEncode(b, len(b), data.EnCode)
-
-		//消息体再base64加密
-		if data.EnCode > 0 {
-			data.Data = base64.StdEncoding.EncodeToString(b)
-		} else {
-			data.Data = string(b[:])
+		msg := v.(*ImDown)
+		body["cmd"] = GetMsgType(&msg.Header)
+		body["tid"] = msg.Tid
+		data["msg"] = string(msg.Msg)
+		body["data"] = data
+		buf, err = json.Marshal(&body)
+		if err != nil {
+			logs.Logger.Error(err)
 		}
-
-		//将整体消息编码为json
-		buf, _ := marshal(&data)
-		return buf
 	case *Resp:
-		msg := data.(*Resp)
-		var data JsonData
-		data.Cmd = GetMsgType(&msg.Header)
-		data.EnCode = GetEncode(&msg.Header)
-		data.Tid = int(msg.Tid)
-
-		var param JsonResp
-		param.Code = int(msg.Code)
-		b, _ := json.Marshal(&param)
-		CodecEncode(b, len(b), data.EnCode)
-
-		//消息体再base64加密
-		if data.EnCode > 0 {
-			data.Data = base64.StdEncoding.EncodeToString(b)
-		} else {
-			data.Data = string(b[:])
+		msg := v.(*Resp)
+		body["cmd"] = GetMsgType(&msg.Header)
+		body["tid"] = msg.Tid
+		data["code"] = int(msg.Code)
+		body["data"] = data
+		buf, err = json.Marshal(&body)
+		if err != nil {
+			logs.Logger.Error(err)
 		}
-		buf, _ := marshal(&data)
-		return buf
 	case *Kick:
-		msg := data.(*Kick)
-		var data JsonData
-		data.Cmd = GetMsgType(&msg.Header)
-		data.EnCode = GetEncode(&msg.Header)
-		data.Tid = int(msg.Tid)
-
-		var param JsonKick
-		param.Reason = int(msg.Reason)
-		b, _ := json.Marshal(&param)
-		CodecEncode(b, len(b), data.EnCode)
-
-		//消息体再base64加密
-		if data.EnCode > 0 {
-			data.Data = base64.StdEncoding.EncodeToString(b)
-		} else {
-			data.Data = string(b[:])
+		msg := v.(*Kick)
+		body["cmd"] = GetMsgType(&msg.Header)
+		body["tid"] = msg.Tid
+		data["reson"] = int(msg.Reason)
+		body["data"] = data
+		buf, err = json.Marshal(&body)
+		if err != nil {
+			logs.Logger.Error(err)
 		}
-		buf, _ := marshal(&data)
-		return buf
-	default:
 	}
-
+	logs.Logger.Debug("packJson=", string(buf[:]))
 	return buf
 }
 
