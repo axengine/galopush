@@ -113,7 +113,7 @@ func (p *session) checkTrans(t *transaction) {
 				p.delTrans(t.tid)
 				return
 			case <-t.timer.C:
-				logs.Logger.Debug("Transcation timeout tid=", t.tid, " uid=", p.id, " plat=", p.plat)
+				logs.Logger.Debug("Transcation timeout type=", t.msgType, " tid=", t.tid, " uid=", p.id, " plat=", p.plat)
 				//time out to save message
 				//只有ANDROID才存离线PUSH WEB什么都不存
 				if t.msgType == protocol.MSGTYPE_PUSH && p.plat == protocol.PLAT_ANDROID {
