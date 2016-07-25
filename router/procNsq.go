@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"galopush/logs"
-	"galopush/protocol"
+	"galopush/internal/logs"
+	"galopush/internal/protocol"
 )
 
 //NsqHandler NSQ CHANNEL句柄

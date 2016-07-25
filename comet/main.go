@@ -2,7 +2,7 @@
 package main
 
 import (
-	"galopush/logs"
+	"galopush/internal/logs"
 	"log"
 	"net/http"
 	_ "net/http/pprof"

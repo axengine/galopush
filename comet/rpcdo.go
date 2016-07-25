@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"galopush/logs"
-	"galopush/protocol"
-	"galopush/rpc"
+	"galopush/internal/logs"
+	"galopush/internal/protocol"
+	"galopush/internal/rpc"
 )
 
 //RPC 异步句柄

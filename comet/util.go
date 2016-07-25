@@ -1,8 +1,8 @@
 package main
 
 import (
-	"galopush/logs"
-	"galopush/protocol"
+	"galopush/internal/logs"
+	"galopush/internal/protocol"
 	"net"
 	"time"
 

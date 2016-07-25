@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"galopush/logs"
-	"galopush/rpc"
+	"galopush/internal/logs"
+	"galopush/internal/rpc"
 )
 
 //RpcAsyncHandle

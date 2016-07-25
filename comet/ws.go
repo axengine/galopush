@@ -1,11 +1,9 @@
 package main
 
 import (
-	//	"encoding/base64"
 	"encoding/json"
-	//	"errors"
-	"galopush/logs"
-	"galopush/protocol"
+	"galopush/internal/logs"
+	"galopush/internal/protocol"
 	"net/http"
 
 	"code.google.com/p/go.net/websocket"

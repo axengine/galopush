@@ -3,9 +3,9 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
-	"galopush/logs"
-	"galopush/protocol"
-	"galopush/rpc"
+	"galopush/internal/logs"
+	"galopush/internal/protocol"
+	"galopush/internal/rpc"
 )
 
 //startSocketHandle 启动runtime个协程处理客户端数据

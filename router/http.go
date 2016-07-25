@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"galopush/logs"
-	"galopush/protocol"
+	"galopush/internal/logs"
+	"galopush/internal/protocol"
 	"net/http"
 	_ "net/http/pprof"
 )

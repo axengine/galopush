@@ -3,7 +3,7 @@ package redisstore
 
 import (
 	"encoding/json"
-	"galopush/logs"
+	"galopush/internal/logs"
 
 	"github.com/hoisie/redis"
 )

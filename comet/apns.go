@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"galopush/logs"
+	"galopush/internal/logs"
 	"strconv"
 
 	apns "github.com/sideshow/apns2"

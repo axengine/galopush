@@ -2,7 +2,7 @@ package rpc
 
 import (
 	"errors"
-	"galopush/logs"
+	"galopush/internal/logs"
 	"net/rpc"
 	"sync"
 	"time"

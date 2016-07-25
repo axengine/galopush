@@ -1,10 +1,10 @@
 package main
 
 import (
-	"galopush/logs"
-	"galopush/nsq"
-	"galopush/redisstore"
-	"galopush/rpc"
+	"galopush/internal/logs"
+	"galopush/internal/nsq"
+	"galopush/internal/redisstore"
+	"galopush/internal/rpc"
 	"runtime/debug"
 	"strconv"
 	"strings"

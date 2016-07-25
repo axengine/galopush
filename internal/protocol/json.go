@@ -3,7 +3,7 @@ package protocol
 import (
 	//	"encoding/base64"
 	"encoding/json"
-	"galopush/logs"
+	"galopush/internal/logs"
 )
 
 func packJson(v interface{}) []byte {

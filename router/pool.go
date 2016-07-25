@@ -5,7 +5,7 @@ package main
  */
 
 import (
-	"galopush/rpc"
+	"galopush/internal/rpc"
 	"sync"
 )
 

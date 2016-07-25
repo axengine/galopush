@@ -1,7 +1,7 @@
 package main
 
 import (
-	"galopush/logs"
+	"galopush/internal/logs"
 	"time"
 )
 
