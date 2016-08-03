@@ -8,25 +8,26 @@ import (
 	"github.com/hoisie/redis"
 )
 
-type offMsg struct {
+type OffMsg struct {
 	Id   string `json:"id"`
-	Body body   `json:"body"`
+	Body Body   `json:"body"`
 }
 
-type body struct {
-	Push     push   `json:"push"`
-	Callback []item `json:"callback"`
-	Im       []item `json:"im"`
+type Body struct {
+	Push     Push   `json:"push"`
+	Callback []Item `json:"callback"`
+	Im       []Item `json:"im"`
 }
 
-type push struct {
+type Push struct {
 	Offline uint16 `json:"offline"`
 	Msg     []byte `json:"msg"`
 }
 
-type item struct {
-	Plat int    `json:"plat"`
-	Msg  []byte `json:"msg"`
+type Item struct {
+	Plat      int    `json:"plat"`
+	WebOnline int    `json:"webOnline"`
+	Msg       []byte `json:"msg"`
 }
 
 type Storager struct {
@@ -44,6 +45,17 @@ func NewStorager(dial, pswd string, db int) *Storager {
 	return &store
 }
 
+//func (p *Storager) GetOfflineMsg(id string) *OffMsg {
+//	var omsg OffMsg
+//	body, err := p.cli.Get(id)
+//	if err != nil {
+//		logs.Logger.Error(err)
+//		return nil
+//	}
+//	json.Unmarshal(body, &omsg)
+//	return &omsg
+//}
+
 func (p *Storager) SavePushMsg(id string, msg []byte) error {
 	logs.Logger.Debug("[Storager] SavePushMsg id=", id, " msg=", string(msg[:]))
 	b, err := p.cli.Exists(id)
@@ -51,7 +63,7 @@ func (p *Storager) SavePushMsg(id string, msg []byte) error {
 		logs.Logger.Error(err)
 		return err
 	}
-	var omsg offMsg
+	var omsg OffMsg
 	switch b {
 	case true:
 		body, err := p.cli.Get(id)
@@ -80,7 +92,7 @@ func (p *Storager) SaveCallbackMsg(id string, plat int, msg []byte) error {
 		logs.Logger.Error(err)
 		return err
 	}
-	var omsg offMsg
+	var omsg OffMsg
 	switch b {
 	case true:
 		body, err := p.cli.Get(id)
@@ -89,12 +101,20 @@ func (p *Storager) SaveCallbackMsg(id string, plat int, msg []byte) error {
 			return err
 		}
 		json.Unmarshal(body, &omsg)
-		var it item
+
+		//校验是否有重复回调 added by ligang @ 2016-08-01
+		for _, v := range omsg.Body.Callback {
+			if string(v.Msg) == string(msg) {
+				break
+			}
+		}
+
+		var it Item
 		it.Msg = append(it.Msg, msg...)
 		it.Plat = plat
 		omsg.Body.Callback = append(omsg.Body.Callback, it)
 	case false:
-		var it item
+		var it Item
 		it.Msg = append(it.Msg, msg...)
 		it.Plat = plat
 		omsg.Body.Callback = append(omsg.Body.Callback, it)
@@ -106,14 +126,14 @@ func (p *Storager) SaveCallbackMsg(id string, plat int, msg []byte) error {
 	return err
 }
 
-func (p *Storager) SaveImMsg(id string, plat int, msg []byte) error {
+func (p *Storager) SaveImMsg(id string, plat, webOnline int, msg []byte) error {
 	logs.Logger.Debug("[Storager] SaveImMsg id=", id, " plat=", plat, " msg=", string(msg[:]))
 	b, err := p.cli.Exists(id)
 	if err != nil {
 		logs.Logger.Error(err)
 		return err
 	}
-	var omsg offMsg
+	var omsg OffMsg
 	switch b {
 	case true:
 		body, err := p.cli.Get(id)
@@ -122,14 +142,20 @@ func (p *Storager) SaveImMsg(id string, plat int, msg []byte) error {
 			return err
 		}
 		json.Unmarshal(body, &omsg)
-		var it item
+		//只存50条
+		if len(omsg.Body.Im) > 50 {
+			omsg.Body.Im = omsg.Body.Im[1:50]
+		}
+		var it Item
 		it.Msg = append(it.Msg, msg...)
 		it.Plat = plat
+		it.WebOnline = webOnline
 		omsg.Body.Im = append(omsg.Body.Im, it)
 	case false:
-		var it item
+		var it Item
 		it.Msg = append(it.Msg, msg...)
 		it.Plat = plat
+		it.WebOnline = webOnline
 		omsg.Body.Im = append(omsg.Body.Im, it)
 	}
 	by, _ := json.Marshal(&omsg)
@@ -143,7 +169,7 @@ func (p *Storager) GetPushMsg(id string) (uint16, []byte) {
 	var offCount uint16
 	var buff []byte
 
-	var omsg offMsg
+	var omsg OffMsg
 	body, err := p.cli.Get(id)
 	if err != nil {
 		logs.Logger.Error(err)
@@ -166,16 +192,16 @@ func (p *Storager) GetPushMsg(id string) (uint16, []byte) {
 func (p *Storager) GetCallbackMsg(id string, plat int) [][]byte {
 	var buff [][]byte
 
-	var omsg offMsg
+	var omsg OffMsg
 	body, err := p.cli.Get(id)
 	if err != nil {
 		logs.Logger.Error(err)
 		return buff
 	}
 	json.Unmarshal(body, &omsg)
-	var newItem []item
+	var newItem []Item
 	for _, v := range omsg.Body.Callback {
-		var it item
+		var it Item
 		it = v
 		if it.Plat == plat {
 			buff = append(buff, it.Msg)
@@ -193,21 +219,21 @@ func (p *Storager) GetCallbackMsg(id string, plat int) [][]byte {
 	return buff
 }
 
-func (p *Storager) GetImMsg(id string, plat int) [][]byte {
-	var buff [][]byte
-	var omsg offMsg
+func (p *Storager) GetImMsg(id string, plat int) []Item {
+	var rItem []Item
+	var newItem []Item
+	var omsg OffMsg
 	body, err := p.cli.Get(id)
 	if err != nil {
 		logs.Logger.Error(err)
-		return buff
+		return rItem
 	}
 	json.Unmarshal(body, &omsg)
-	var newItem []item
 	for _, v := range omsg.Body.Im {
-		var it item
+		var it Item
 		it = v
 		if it.Plat == plat {
-			buff = append(buff, it.Msg)
+			rItem = append(rItem, it)
 		} else {
 			newItem = append(newItem, it)
 		}
@@ -219,5 +245,5 @@ func (p *Storager) GetImMsg(id string, plat int) [][]byte {
 	if err = p.cli.Set(id, by); err != nil {
 		logs.Logger.Error(err)
 	}
-	return buff
+	return rItem
 }

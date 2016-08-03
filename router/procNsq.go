@@ -25,22 +25,24 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 			logs.Logger.Error(err, string(b[:]))
 			return
 		}
-		logs.Logger.Debug("sessionTimeout ", msg)
-		sess := p.pool.findSessions(msg.Uid)
+		//logs.Logger.Debug("sessionTimeout ", msg)
+		sess := p.pool.findSessions(msg.Sess.Uid)
 		if sess != nil {
 			for _, v := range sess.item {
 				//找到对应终端类型
-				if v.plat == msg.Termtype {
+				if v.plat == msg.Sess.Termtype {
 					if v.online == true {
 						bOnline = true
+						break
 					}
 				}
 			}
 		}
-
-		msg.Flag = bOnline
+		if bOnline {
+			msg.Sess.Flag = 1
+		}
 		buff, _ := json.Marshal(&msg)
-		if err := p.producer.Publish(msg.Topic, buff); err != nil {
+		if err := p.producer.Publish(msg.BackTopic, buff); err != nil {
 			logs.Logger.Error("sessionTimeout push to nsq Failed ", err, " msg=", string(buff[:]))
 		}
 	case p.topics[0]: //userOnlineState
@@ -58,12 +60,7 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 				for _, v := range sess.item {
 					//找到对应终端类型
 					if v.plat == msg.Termtype {
-						find = true
-						v.authCode = msg.Code
-						v.deviceToken = msg.DeviceToken
-						v.login = msg.Login
 						logs.Logger.Debug("UserState Find Item=", v, " uid=", msg.Uid)
-
 						//socket在线 用户在线
 						if v.online == true && msg.Login == true {
 							//踢人
@@ -74,8 +71,8 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 							}
 						}
 
-						//socket在线 用户离线
-						if v.online == true && msg.Login == false {
+						//socket在线 用户离线 增加对鉴权吗的校验 防止web踢人后又下线的BUG
+						if v.online == true && msg.Login == false && v.authCode == msg.Code {
 							//踢人
 							c := p.pool.findComet(sess.cometId)
 							if c != nil {
@@ -83,6 +80,11 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 								c.rpcClient.Kick(sess.id, v.plat, protocol.KICK_REASON_MUTEX)
 							}
 						}
+
+						find = true
+						v.authCode = msg.Code
+						v.deviceToken = msg.DeviceToken
+						v.login = msg.Login
 					} else {
 						//处理ANDROID IOS互斥
 						if v.plat|msg.Termtype <= 0x03 {
@@ -146,7 +148,7 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 					if comet != nil {
 						for _, it := range sess.item {
 							if it.plat&receiver.Termtype > 0 {
-								err := comet.rpcClient.Push(msgType, sess.id, it.plat, msg.Body)
+								err := comet.rpcClient.Push(msgType, sess.id, it.plat, msg.Flag, msg.Body)
 								if err != nil {
 									logs.Logger.Error(err)
 									if it.plat != PLAT_WEB { //web不存离线
@@ -181,7 +183,6 @@ func (p *Router) SaveOfflineMsg(msgType int, id string, termtype int, msg string
 	case protocol.MSGTYPE_CALLBACK:
 		p.store.SaveCallbackMsg(id, termtype, []byte(msg))
 	case protocol.MSGTYPE_MESSAGE:
-		p.store.SaveImMsg(id, termtype, []byte(msg))
-
+		p.store.SaveImMsg(id, termtype, 0, []byte(msg))
 	}
 }

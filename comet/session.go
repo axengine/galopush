@@ -10,9 +10,9 @@ import (
 type Pool struct {
 	//id为识别符 由用户id+plat唯一指定
 	mutex1   sync.Mutex
-	ids      map[string]string //<addr-id>
+	ids      map[string]string //<addr-ids>
 	mutex2   sync.Mutex
-	sessions map[string]*session //<id-session>
+	sessions map[string]*session //<ids-session>
 }
 
 func (p *Pool) insertIds(addr, id string) {
@@ -65,11 +65,12 @@ type session struct {
 }
 
 type transaction struct {
-	tid     int
-	msgType int
-	timer   *time.Timer
-	exit    chan int
-	msg     []byte
+	tid       int
+	msgType   int
+	webOnline int
+	timer     *time.Timer
+	exit      chan int
+	msg       []byte
 }
 
 func newTransaction() *transaction {
@@ -121,7 +122,7 @@ func (p *session) checkTrans(t *transaction) {
 				} else if t.msgType == protocol.MSGTYPE_CALLBACK && p.plat != protocol.PLAT_WEB {
 					gsComet.store.SaveCallbackMsg(p.id, p.plat, t.msg)
 				} else if t.msgType == protocol.MSGTYPE_MESSAGE && p.plat != protocol.PLAT_WEB {
-					gsComet.store.SaveImMsg(p.id, p.plat, t.msg)
+					gsComet.store.SaveImMsg(p.id, p.plat, t.webOnline, t.msg)
 				}
 				t.exit <- 1
 			}
@@ -154,6 +155,7 @@ func (p *session) delTrans(tid int) {
 	for i, t := range p.trans {
 		if t.tid == tid {
 			t.timer.Stop()
+			close(t.exit)
 			p.trans = append(p.trans[:i], p.trans[i+1:]...)
 			break
 		}

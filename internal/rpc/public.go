@@ -84,6 +84,7 @@ type KickRequst struct {
  */
 type PushRequst struct {
 	Tp       int //消息类型
+	Flag     int
 	Id       string
 	Termtype int
 	Msg      string

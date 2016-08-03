@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"galopush/internal/logs"
+	"galopush/internal/protocol"
 	"galopush/internal/rpc"
 )
 
@@ -43,6 +44,13 @@ func (p *Router) RpcAsyncHandle(request interface{}) {
 							logs.Logger.Debug("StateNotify Find session uid=", s.id, " comet=", s.cometId, " item=", v)
 							find = true
 							v.online = true
+						} else if v.plat+msg.Termtype == 3 { //added by ligang @ 2016-07-26
+							//踢人
+							c := p.pool.findComet(s.cometId)
+							if c != nil {
+								logs.Logger.Debug("StateNotify Kick Because repeat login id=", s.id, " palt=", v.plat)
+								c.rpcClient.Kick(s.id, v.plat, protocol.KICK_REASON_REPEAT)
+							}
 						}
 					}
 					if !find {

@@ -20,15 +20,21 @@ type UserOnlineState struct {
 }
 
 type SessionTimeout struct {
+	BackTopic string  `json:"backTopic"`
+	Key       string  `json:"key"`
+	Sess      Session `json:"msg"`
+}
+
+type Session struct {
 	Termtype  int    `json:"ctype"`
 	Uid       string `json:"uid"`
 	SessionId string `json:"sessionId"`
-	Topic     string `json:"key"`
-	Flag      bool   `json:"flag"`
+	Flag      int    `json:"flag"`
 }
 
 type MsgDownward struct {
 	Receivers []Receiver `json:"receivers"`
+	Flag      int        `json:"flag"`
 	Body      string     `json:"body"`
 }
 
