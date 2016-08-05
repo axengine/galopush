@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"galopush/internal/logs"
 	"galopush/internal/protocol"
+	"galopush/internal/rds"
 )
 
 //NsqHandler NSQ CHANNEL句柄
@@ -19,29 +20,17 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 
 	switch topic {
 	case p.topics[4]: //sessionTimeout
-		var bOnline bool
 		var msg SessionTimeout
 		if err := json.Unmarshal(b, &msg); err != nil {
 			logs.Logger.Error(err, string(b[:]))
 			return
 		}
-		//logs.Logger.Debug("sessionTimeout ", msg)
-		sess := p.pool.findSessions(msg.Sess.Uid)
-		if sess != nil {
-			for _, v := range sess.item {
-				//找到对应终端类型
-				if v.plat == msg.Sess.Termtype {
-					if v.online == true {
-						bOnline = true
-						break
-					}
-				}
-			}
-		}
-		if bOnline {
+
+		if online := p.store.SessionOnline(msg.Sess.Uid, msg.Sess.Termtype); online {
 			msg.Sess.Flag = 1
 		}
 		buff, _ := json.Marshal(&msg)
+		logs.Logger.Info("[session time out resp]", string(buff[:]))
 		if err := p.producer.Publish(msg.BackTopic, buff); err != nil {
 			logs.Logger.Error("sessionTimeout push to nsq Failed ", err, " msg=", string(buff[:]))
 		}
@@ -53,75 +42,70 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 				return
 			}
 
-			//查找session
-			sess := p.pool.findSessions(msg.Uid)
-			if sess != nil {
+			{
 				var find bool
-				for _, v := range sess.item {
-					//找到对应终端类型
-					if v.plat == msg.Termtype {
-						logs.Logger.Debug("UserState Find Item=", v, " uid=", msg.Uid)
-						//socket在线 用户在线
-						if v.online == true && msg.Login == true {
-							//踢人
-							c := p.pool.findComet(sess.cometId)
-							if c != nil {
-								logs.Logger.Debug("UserState Kick Because repeat login id=", sess.id, " palt=", v.plat)
-								c.rpcClient.Kick(sess.id, v.plat, protocol.KICK_REASON_REPEAT)
-							}
-						}
+				sess := p.store.FindSessions(msg.Uid)
+				if sess != nil {
+					for _, v := range sess.Sess {
+						if v.Plat == msg.Termtype {
+							logs.Logger.Debug("UserState Find id=", v.Id, " plat=", v.Plat, " online=", v.Online, " login=", v.Login, " token=", v.AuthCode)
 
-						//socket在线 用户离线 增加对鉴权吗的校验 防止web踢人后又下线的BUG
-						if v.online == true && msg.Login == false && v.authCode == msg.Code {
-							//踢人
-							c := p.pool.findComet(sess.cometId)
-							if c != nil {
-								logs.Logger.Debug("UserState Kick Because unlogin id=", sess.id, " palt=", v.plat)
-								c.rpcClient.Kick(sess.id, v.plat, protocol.KICK_REASON_MUTEX)
-							}
-						}
-
-						find = true
-						v.authCode = msg.Code
-						v.deviceToken = msg.DeviceToken
-						v.login = msg.Login
-					} else {
-						//处理ANDROID IOS互斥
-						if v.plat|msg.Termtype <= 0x03 {
-							if v.login == true && msg.Login == true {
+							//socket在线 用户在线
+							if v.Online == true && msg.Login == true {
 								//踢人
-								c := p.pool.findComet(sess.cometId)
+								c := p.pool.findComet(sess.CometId)
 								if c != nil {
-									logs.Logger.Debug("UserState Kick Because mutex id=", sess.id, " palt=", v.plat)
-									c.rpcClient.Kick(sess.id, v.plat, protocol.KICK_REASON_MUTEX)
+									logs.Logger.Info("UserState Kick Because repeat login id=", v.Id, " palt=", v.Plat)
+									c.rpcClient.Kick(v.Id, v.Plat, v.AuthCode, protocol.KICK_REASON_REPEAT)
 								}
 							}
+
+							//socket在线 用户离线 增加对鉴权码的校验 防止web踢人后又下线的BUG
+							if v.Online == true && msg.Login == false && v.AuthCode == msg.Code {
+								//踢人
+								c := p.pool.findComet(sess.CometId)
+								if c != nil {
+									logs.Logger.Info("UserState Kick Because unlogin id=", v.Id, " palt=", v.Plat)
+									c.rpcClient.Kick(v.Id, v.Plat, v.AuthCode, protocol.KICK_REASON_MUTEX)
+								}
+							}
+
+							find = true
+							v.AuthCode = msg.Code
+							v.IOSToken = msg.DeviceToken
+							v.Login = msg.Login
 						}
 					}
+					//有session但无对应终端类型
+					if find == false {
+						var it rds.Session
+						it.Id = msg.Uid
+						it.Plat = msg.Termtype
+						it.Online = false
+						it.Login = msg.Login
+						it.AuthCode = msg.Code
+						it.IOSToken = msg.DeviceToken
+						sess.Sess = append(sess.Sess, &it)
+						logs.Logger.Debug("UserState New item=", it)
+					}
+					p.store.SaveSessions(sess)
+				} else {
+					//没有找到session
+					sess = new(rds.Sessions)
+					sess.Id = msg.Uid
+
+					var it rds.Session
+					it.Id = msg.Uid
+					it.Plat = msg.Termtype
+					it.Online = false
+					it.Login = msg.Login
+					it.AuthCode = msg.Code
+					it.IOSToken = msg.DeviceToken
+					sess.Sess = append(sess.Sess, &it)
+					p.store.SaveSessions(sess)
+
+					logs.Logger.Debug("UserState New session ", it)
 				}
-				//有session但无对应终端类型
-				if find == false {
-					var it item
-					it.plat = msg.Termtype
-					it.online = false
-					it.authCode = msg.Code
-					it.deviceToken = msg.DeviceToken
-					it.login = msg.Login
-					sess.item = append(sess.item, &it)
-					logs.Logger.Debug("UserState New Item=", it, " uid=", msg.Uid)
-				}
-			} else {
-				//没有找到session
-				sess = new(session)
-				sess.id = msg.Uid
-				var it item
-				it.plat = msg.Termtype
-				it.authCode = msg.Code
-				it.deviceToken = msg.DeviceToken
-				it.login = msg.Login
-				sess.item = append(sess.item, &it)
-				p.pool.insertSessions(msg.Uid, sess)
-				logs.Logger.Debug("UserState New session uid=", msg.Uid, " item=", it)
 			}
 		}
 	case p.topics[1], p.topics[2], p.topics[3]: //push callback message
@@ -142,34 +126,35 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 			}
 
 			for _, receiver := range msg.Receivers {
-				sess := p.pool.findSessions(receiver.Uid)
-				if sess != nil {
-					comet := p.pool.findComet(sess.cometId)
-					if comet != nil {
-						for _, it := range sess.item {
-							if it.plat&receiver.Termtype > 0 {
-								err := comet.rpcClient.Push(msgType, sess.id, it.plat, msg.Flag, msg.Body)
-								if err != nil {
-									logs.Logger.Error(err)
-									if it.plat != PLAT_WEB { //web不存离线
-										p.SaveOfflineMsg(msgType, sess.id, it.plat, msg.Body)
-									}
-								}
-							}
+				sess := p.store.FindSessions(receiver.Uid)
+				if sess == nil {
+					logs.Logger.Error("OnPush canot find session uid=", receiver.Uid, " plat=", receiver.Termtype)
+					continue
+				}
+
+				//comet 离线了
+				comet := p.pool.findComet(sess.CometId)
+				if comet == nil {
+					logs.Logger.Error("OnPush comet offline ", sess.CometId)
+					for _, it := range sess.Sess {
+						if it.Plat&receiver.Termtype > 0 {
+							p.SaveOfflineMsg(msgType, it.Id, it.Plat, msg.Body)
 						}
-					} else {
-						logs.Logger.Debug("Push Failed comet offline comet=", sess.cometId)
-						//comet offline need save msg
-						for _, it := range sess.item {
-							if it.plat&receiver.Termtype > 0 {
-								if it.plat != PLAT_WEB { //web不存离线
-									p.SaveOfflineMsg(msgType, sess.id, it.plat, msg.Body)
-								}
+					}
+					continue
+				}
+
+				for _, it := range sess.Sess {
+					if it.Plat&receiver.Termtype > 0 {
+						logs.Logger.Info("[OnPush>>>] topic=", topic, " to id=", it.Id, " plat=", it.Plat)
+						err := comet.rpcClient.Push(msgType, it.Id, it.Plat, msg.Flag, msg.Body)
+						if err != nil {
+							logs.Logger.Error(err)
+							if it.Plat != PLAT_WEB { //web不存离线
+								p.SaveOfflineMsg(msgType, it.Id, it.Plat, msg.Body)
 							}
 						}
 					}
-				} else {
-					logs.Logger.Debug("Push Failed not find session id=", receiver.Uid)
 				}
 			}
 		}
@@ -179,10 +164,10 @@ func (p *Router) NsqHandler(topic string, i interface{}) {
 func (p *Router) SaveOfflineMsg(msgType int, id string, termtype int, msg string) {
 	switch msgType {
 	case protocol.MSGTYPE_PUSH:
-		p.store.SavePushMsg(id, []byte(msg))
+		p.store.SavePushMsg(id, termtype, []byte(msg))
 	case protocol.MSGTYPE_CALLBACK:
 		p.store.SaveCallbackMsg(id, termtype, []byte(msg))
 	case protocol.MSGTYPE_MESSAGE:
-		p.store.SaveImMsg(id, termtype, 0, []byte(msg))
+		p.store.SaveImMsg(id, termtype, []byte(msg))
 	}
 }

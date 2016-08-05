@@ -60,17 +60,17 @@ type session struct {
 	encode     int
 	appleToken string
 	tid        int
+	token      string
 	mutex      sync.Mutex
 	trans      []*transaction
 }
 
 type transaction struct {
-	tid       int
-	msgType   int
-	webOnline int
-	timer     *time.Timer
-	exit      chan int
-	msg       []byte
+	tid     int
+	msgType int
+	timer   *time.Timer
+	exit    chan int
+	msg     []byte
 }
 
 func newTransaction() *transaction {
@@ -118,11 +118,11 @@ func (p *session) checkTrans(t *transaction) {
 				//time out to save message
 				//只有ANDROID才存离线PUSH WEB什么都不存
 				if t.msgType == protocol.MSGTYPE_PUSH && p.plat == protocol.PLAT_ANDROID {
-					gsComet.store.SavePushMsg(p.id, t.msg)
+					gsComet.store.SavePushMsg(p.id, p.plat, t.msg)
 				} else if t.msgType == protocol.MSGTYPE_CALLBACK && p.plat != protocol.PLAT_WEB {
 					gsComet.store.SaveCallbackMsg(p.id, p.plat, t.msg)
 				} else if t.msgType == protocol.MSGTYPE_MESSAGE && p.plat != protocol.PLAT_WEB {
-					gsComet.store.SaveImMsg(p.id, p.plat, t.webOnline, t.msg)
+					gsComet.store.SaveImMsg(p.id, p.plat, t.msg)
 				}
 				t.exit <- 1
 			}

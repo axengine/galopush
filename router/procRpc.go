@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"galopush/internal/logs"
-	"galopush/internal/protocol"
+	//	"galopush/internal/protocol"
 	"galopush/internal/rpc"
 )
 
@@ -21,57 +21,30 @@ func (p *Router) RpcAsyncHandle(request interface{}) {
 			msg := request.(*rpc.StateNotify)
 			logs.Logger.Info("[rpc] StateNotify id=", msg.Id, " plat=", msg.Termtype, " state=", msg.State, " comet=", msg.CometId)
 			if msg.State == 0 { //offline
-				s := p.pool.findSessions(msg.Id)
-				if s != nil {
-					s.cometId = msg.CometId
-					for _, v := range s.item {
-						if v.plat == msg.Termtype {
-							v.online = false
-							//负载-1
-							p.pool.cometSub(s.cometId)
+				sess := p.store.FindSessions(msg.Id)
+				if sess != nil {
+					sess.CometId = msg.CometId
+					for _, it := range sess.Sess {
+						p.pool.cometSub(msg.CometId)
+						if it.Plat == msg.Termtype && it.AuthCode == msg.Token {
+							it.Online = false
 							return
 						}
 					}
+					p.store.SaveSessions(sess)
 				}
 			} else if msg.State == 1 {
-				//online
-				s := p.pool.findSessions(msg.Id)
-				if s != nil {
-					s.cometId = msg.CometId
-					var find bool
-					for _, v := range s.item {
-						if v.plat == msg.Termtype {
-							logs.Logger.Debug("StateNotify Find session uid=", s.id, " comet=", s.cometId, " item=", v)
-							find = true
-							v.online = true
-						} else if v.plat+msg.Termtype == 3 { //added by ligang @ 2016-07-26
-							//踢人
-							c := p.pool.findComet(s.cometId)
-							if c != nil {
-								logs.Logger.Debug("StateNotify Kick Because repeat login id=", s.id, " palt=", v.plat)
-								c.rpcClient.Kick(s.id, v.plat, protocol.KICK_REASON_REPEAT)
-							}
+				sess := p.store.FindSessions(msg.Id)
+				if sess != nil {
+					sess.CometId = msg.CometId
+					p.pool.cometAdd(msg.CometId)
+					for _, it := range sess.Sess {
+						if it.Plat == msg.Termtype && it.AuthCode == msg.Token {
+							it.Online = true
 						}
 					}
-					if !find {
-						var it item
-						it.online = true
-						it.plat = msg.Termtype
-						s.item = append(s.item, &it)
-					}
-					p.pool.cometAdd(s.cometId)
-				} /* else {
-					s = new(session)
-					s.id = msg.Id
-					s.cometId = msg.CometId
-					var i item
-					i.online = true
-					i.plat = msg.Termtype
-					s.item = append(s.item, i)
-
-					p.pool.insertSessions(msg.Id, s)
-					p.pool.cometAdd(s.cometId)
-				}*/ //应该必须能找到session 因为要先通过业务层信息鉴权
+					p.store.SaveSessions(sess)
+				}
 			}
 		}
 	default:
@@ -95,20 +68,21 @@ func (p *Router) RpcSyncHandle(request interface{}) int {
 		{
 			msg := request.(*rpc.AuthRequest)
 			logs.Logger.Info("[rpc] Auth Receive id=", msg.Id, " termtype=", msg.Termtype, " code=", msg.Code)
-			sess := p.pool.findSessions(msg.Id)
-			if sess == nil {
-				logs.Logger.Error("[rpc] Auth Failed Not Find session id=", msg.Id, " termtype=", msg.Termtype, " code=", msg.Code)
-				return code
-			}
-			for _, v := range sess.item {
-				//业务层已登录 终端类型相同 鉴权码相同
-				if v.plat == msg.Termtype {
-					if v.authCode == msg.Code && v.login == true {
-						code = rpc.RPC_RET_SUCCESS
-						logs.Logger.Debug("[rpc] Auth success id=", msg.Id, " termtype=", msg.Termtype, " code=", msg.Code)
-						return code
-					} else {
-						logs.Logger.Debug("[rpc] Auth Failed Error Code or state id=", msg.Id, " item=", v)
+			{
+				sess := p.store.FindSessions(msg.Id)
+				if sess == nil {
+					logs.Logger.Error("[rpc] Auth Failed Not Find session id=", msg.Id, " termtype=", msg.Termtype, " code=", msg.Code)
+					return code
+				}
+				for _, v := range sess.Sess {
+					if v.Plat == msg.Termtype {
+						if v.AuthCode == msg.Code && v.Login == true {
+							code = rpc.RPC_RET_SUCCESS
+							logs.Logger.Debug("[rpc] Auth success id=", msg.Id, " termtype=", msg.Termtype, " code=", msg.Code)
+							return code
+						} else {
+							logs.Logger.Debug("[rpc] Auth Failed Error Code or state id=", msg.Id, " item=", v)
+						}
 					}
 				}
 			}

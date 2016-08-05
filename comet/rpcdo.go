@@ -15,7 +15,7 @@ func (p *Comet) RpcAsyncHandle(request interface{}) {
 		}
 	}()
 	msg := request.(*rpc.PushRequst)
-	logs.Logger.Debug("Receive NSQ type=", msg.Tp, " id=", msg.Id, " palt=", msg.Termtype, " msg=", msg.Msg)
+	logs.Logger.Info("Receive From Router type=", msg.Tp, " id=", msg.Id, " palt=", msg.Termtype, " msg=", msg.Msg)
 	switch request.(type) {
 	case *rpc.PushRequst:
 		switch msg.Tp {
@@ -40,8 +40,7 @@ func (p *Comet) RpcSyncHandle(request interface{}) int {
 	case *rpc.KickRequst:
 		{
 			msg := request.(*rpc.KickRequst)
-			logs.Logger.Debug("Kick id=", msg.Id, " plat=", msg.Termtype)
-
+			logs.Logger.Info("Receive From Router Kick it=", msg.Id, " plat=", msg.Termtype, " reson=", msg.Reason, " token=", msg.Token)
 			p.kick(msg)
 		}
 	}
@@ -55,7 +54,7 @@ func (p *Comet) push(msg *rpc.PushRequst) {
 	if plat == protocol.PLAT_WEB {
 		ptlType = protocol.PROTOCOL_TYPE_JSON
 	}
-	logs.Logger.Debug("[PUSH>>>]  id=", msg.Id, " plat=", plat, " msg=", msg.Msg)
+	logs.Logger.Debug("[>>>PUSH]  id=", msg.Id, " plat=", plat)
 
 	//判断web是否在线
 	iWebOnline := 0
@@ -80,7 +79,7 @@ func (p *Comet) push(msg *rpc.PushRequst) {
 		if err := p.write(sess.conn, buf); err != nil {
 			logs.Logger.Error("PUSH>>> write error:", err)
 			if plat == protocol.PLAT_ANDROID {
-				p.store.SavePushMsg(id, []byte(msg.Msg))
+				p.store.SavePushMsg(id, plat, []byte(msg.Msg))
 			} else if plat == protocol.PLAT_IOS {
 				//APNS
 				go apnsPush(sess.appleToken, msg.Msg, "", msg.Flag)
@@ -90,15 +89,16 @@ func (p *Comet) push(msg *rpc.PushRequst) {
 			trans := newTransaction()
 			trans.tid = int(sendMsg.Tid)
 			trans.msgType = protocol.MSGTYPE_PUSH
-			trans.webOnline = iWebOnline
+			//			trans.webOnline = iWebOnline
 			trans.msg = append(trans.msg, msg.Msg...) //mem leak
 			sess.saveTransaction(trans)
 			sess.checkTrans(trans)
 		}
 	} else {
+		logs.Logger.Debug("[>>>PUSH]Not find session id=", msg.Id, " plat=", plat)
 		//这里没有session 找不到ios的设备ID 直接存离线
 		if plat != protocol.PLAT_WEB {
-			p.store.SavePushMsg(id, []byte(msg.Msg))
+			p.store.SavePushMsg(id, plat, []byte(msg.Msg))
 		}
 	}
 }
@@ -110,7 +110,7 @@ func (p *Comet) callback(msg *rpc.PushRequst) {
 	if plat == protocol.PLAT_WEB {
 		ptlType = protocol.PROTOCOL_TYPE_JSON
 	}
-	logs.Logger.Debug("[CALLBACK>>>]  id=", msg.Id, " plat=", plat, " msg=", msg.Msg)
+	logs.Logger.Debug("[>>>CALLBACK]  id=", msg.Id, " plat=", plat)
 
 	ids := fmt.Sprintf("%s-%d", id, plat)
 	if sess := p.pool.findSessions(ids); sess != nil {
@@ -133,12 +133,13 @@ func (p *Comet) callback(msg *rpc.PushRequst) {
 			trans := newTransaction()
 			trans.tid = int(sendMsg.Tid)
 			trans.msgType = protocol.MSGTYPE_CALLBACK
-			trans.webOnline = 0
+			//			trans.webOnline = 0
 			trans.msg = append(trans.msg, []byte(msg.Msg)...) //mem leak
 			sess.saveTransaction(trans)
 			sess.checkTrans(trans)
 		}
 	} else {
+		logs.Logger.Debug("[>>>CALLBACK]Not find session id=", msg.Id, " plat=", plat)
 		if plat != protocol.PLAT_WEB {
 			p.store.SaveCallbackMsg(id, plat, []byte(msg.Msg))
 		}
@@ -152,7 +153,7 @@ func (p *Comet) message(msg *rpc.PushRequst) {
 	if plat == protocol.PLAT_WEB {
 		ptlType = protocol.PROTOCOL_TYPE_JSON
 	}
-	logs.Logger.Debug("[MESSAGE>>>]  id=", msg.Id, " plat=", plat, " msg=", msg.Msg)
+	logs.Logger.Debug("[>>>MESSAGE]  id=", msg.Id, " plat=", plat)
 
 	//判断web是否在线
 	iWebOnline := 0
@@ -176,21 +177,22 @@ func (p *Comet) message(msg *rpc.PushRequst) {
 		if err := p.write(sess.conn, buf); err != nil {
 			logs.Logger.Error("MESSAGE>>> write error:", err)
 			if plat != protocol.PLAT_WEB {
-				p.store.SaveImMsg(id, plat, iWebOnline, []byte(msg.Msg))
+				p.store.SaveImMsg(id, plat, []byte(msg.Msg))
 			}
 		} else {
 			//创建事务并保存
 			trans := newTransaction()
 			trans.tid = int(sendMsg.Tid)
 			trans.msgType = protocol.MSGTYPE_MESSAGE
-			trans.webOnline = iWebOnline
+			//			trans.webOnline = iWebOnline
 			trans.msg = append(trans.msg, []byte(msg.Msg)...) //mem leak
 			sess.saveTransaction(trans)
 			sess.checkTrans(trans)
 		}
 	} else {
+		logs.Logger.Debug("[>>>MESSAGE]Not find session id=", msg.Id, " plat=", plat)
 		if plat != protocol.PLAT_WEB {
-			p.store.SaveImMsg(id, plat, iWebOnline, []byte(msg.Msg))
+			p.store.SaveImMsg(id, plat, []byte(msg.Msg))
 		}
 	}
 }
@@ -202,10 +204,13 @@ func (p *Comet) kick(msg *rpc.KickRequst) {
 	if plat == protocol.PLAT_WEB {
 		ptlType = protocol.PROTOCOL_TYPE_JSON
 	}
-	//logs.Logger.Debug("[Kick>>>]  id=", msg.Id, " plat=", plat, " reason=", msg.Reason)
+	logs.Logger.Debug("[>>>KICK]  id=", msg.Id, " plat=", plat, " reason=", msg.Reason)
 
 	ids := fmt.Sprintf("%s-%d", id, plat)
 	if sess := p.pool.findSessions(ids); sess != nil {
+		if sess.token != msg.Token {
+			return
+		}
 		var sendMsg protocol.Kick
 		protocol.SetMsgType(&sendMsg.Header, protocol.MSGTYPE_KICK)
 		protocol.SetEncode(&sendMsg.Header, sess.encode)
@@ -214,13 +219,13 @@ func (p *Comet) kick(msg *rpc.KickRequst) {
 		sendMsg.Reason = uint8(msg.Reason)
 
 		buf := protocol.Pack(&sendMsg, ptlType)
-		logs.Logger.Debug("[Kick>>>]  to id=", id, " plat=", plat, " Tid=", sendMsg.Tid, " reason=", sendMsg.Reason)
+		logs.Logger.Debug("[KICK>>>]  to id=", id, " plat=", plat, " Tid=", sendMsg.Tid, " reason=", sendMsg.Reason)
 		if err := p.write(sess.conn, buf); err != nil {
 			logs.Logger.Error("KICK>>> write error:", err)
 		}
 
 		//上报router
-		p.rpcCli.Notify(sess.id, p.cometId, rpc.STATE_OFFLINE, sess.plat)
+		p.rpcCli.Notify(sess.id, sess.plat, sess.token, rpc.STATE_OFFLINE, p.cometId)
 		//清除session
 		sess.destroy()
 		p.pool.deleteSessions(ids)

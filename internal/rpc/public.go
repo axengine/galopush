@@ -51,6 +51,7 @@ type AuthRequest struct {
 type StateNotify struct {
 	Id       string
 	Termtype int
+	Token    string
 	CometId  string //附着Comet ID
 	State    int    //1-online 0-offline
 }
@@ -70,7 +71,7 @@ type MsgUpwardRequst struct {
 type KickRequst struct {
 	Id       string
 	Termtype int
-
+	Token    string
 	/* added by liang @ 2016-07-11
 	0x01:重复登录，同终端类型客户端登录
 	0x02:互斥登录，Android/iOS互斥

@@ -3,7 +3,8 @@ package main
 import (
 	"galopush/internal/logs"
 	"galopush/internal/nsq"
-	"galopush/internal/redisstore"
+	"galopush/internal/rds"
+	//	"galopush/internal/redisstore"
 	"galopush/internal/rpc"
 	"runtime/debug"
 	"strconv"
@@ -34,7 +35,8 @@ type Router struct {
 	pool         *Pool
 
 	//离线消息
-	store *redisstore.Storager
+	//store *redisstore.Storager
+	store *rds.Storager
 
 	//系统控制
 	exit chan struct{}
@@ -73,7 +75,7 @@ func (p *Router) Init() {
 
 	p.pool = new(Pool)
 	p.pool.comets = make(map[string]*comet)
-	p.pool.sessions = make(map[string]*session)
+	//	p.pool.sessions = make(map[string]*session)
 
 	//REDIS
 	{
@@ -85,7 +87,7 @@ func (p *Router) Init() {
 		if err != nil {
 			database = 0
 		}
-		p.store = redisstore.NewStorager(dbconn, password, database)
+		p.store = rds.NewStorager(dbconn, password, database)
 		logs.Logger.Debug("----redis addr=", dbconn, " password:", password, " database:", database)
 	}
 
@@ -110,7 +112,8 @@ func (p *Router) Start() {
 			select {
 			case id := <-p.cometExit:
 				p.pool.deleteComet(id)
-				p.pool.deleteSessionsWithCometId(id)
+				p.store.OfflineComet(id)
+				//p.pool.deleteSessionsWithCometId(id)
 			}
 		}
 	}()
@@ -148,7 +151,7 @@ func (p *Router) stat() {
 	for {
 		select {
 		case <-t.C:
-			logs.Logger.Debug("Registered ", len(p.pool.comets), " comets with ", len(p.pool.sessions), " sessions")
+			logs.Logger.Debug("Registered ", len(p.pool.comets), " comets with ", p.store.SessionCount(), " sessions")
 		}
 	}
 }

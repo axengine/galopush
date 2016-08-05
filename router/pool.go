@@ -10,10 +10,10 @@ import (
 )
 
 type Pool struct {
-	m1       sync.Mutex
-	comets   map[string]*comet
-	m2       sync.Mutex
-	sessions map[string]*session
+	m1     sync.Mutex
+	comets map[string]*comet
+	//m2       sync.Mutex
+	//sessions map[string]*session
 }
 
 //用户session
@@ -96,6 +96,7 @@ func (p *Pool) balancer() *comet {
 	return c
 }
 
+/*
 func (p *Pool) insertSessions(id string, s *session) {
 	p.m2.Lock()
 	defer p.m2.Unlock()
@@ -126,4 +127,4 @@ func (p *Pool) deleteSessionsWithCometId(id string) {
 			}
 		}
 	}
-}
+}*/

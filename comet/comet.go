@@ -3,7 +3,7 @@ package main
 import (
 	"galopush/internal/counter"
 	"galopush/internal/logs"
-	"galopush/internal/redisstore"
+	"galopush/internal/rds"
 	"galopush/internal/rpc"
 	"runtime/debug"
 	"strconv"
@@ -38,7 +38,7 @@ type Comet struct {
 
 	//离线消息
 	//offStore
-	store *redisstore.Storager
+	store *rds.Storager
 
 	//系统控制
 	exit chan string
@@ -91,7 +91,7 @@ func (p *Comet) Init() {
 		if err != nil {
 			database = 0
 		}
-		p.store = redisstore.NewStorager(dbconn, password, database)
+		p.store = rds.NewStorager(dbconn, password, database)
 		logs.Logger.Debug("----redis addr=", dbconn, " password:", password, " database:", database)
 	}
 

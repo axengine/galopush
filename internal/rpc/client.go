@@ -61,10 +61,10 @@ func (p *RpcClient) Close() error {
 	return p.rpcClient.Close()
 }
 
-//StartPing start heartbeat with the ticker 30 s
+//StartPing start heartbeat with the ticker 5 s
 func (p *RpcClient) StartPing() {
 	go func(client *RpcClient) {
-		tk := time.NewTicker(time.Second * 30)
+		tk := time.NewTicker(time.Second * 5)
 		for {
 			select {
 			case <-tk.C:
@@ -118,12 +118,13 @@ func (p *RpcClient) Auth(id string, termtype int, code string) error {
 }
 
 //Notify 用户状态登记
-func (p *RpcClient) Notify(id, cometId string, state, termtype int) error {
-	logs.Logger.Debug("[rpcclient] report state id=", id, " cometId=", cometId, " plat=", termtype, " state=", state)
+func (p *RpcClient) Notify(id string, plat int, token string, state int, cometId string) error {
+	logs.Logger.Debug("[rpcclient] report state id=", id, " plat=", plat, " token=", token, " state=", state, " comet=", cometId)
 	var request StateNotify
 	request.Id = id
 	request.CometId = cometId
-	request.Termtype = termtype
+	request.Token = token
+	request.Termtype = plat
 	request.State = state
 
 	var respone Response
@@ -155,10 +156,11 @@ func (p *RpcClient) MsgUpward(id string, termtype int, msg string) error {
 }
 
 //Kick 踢人下线
-func (p *RpcClient) Kick(id string, termtype, reason int) error {
+func (p *RpcClient) Kick(id string, plat int, token string, reason int) error {
 	var request KickRequst
 	request.Id = id
-	request.Termtype = termtype
+	request.Termtype = plat
+	request.Token = token
 	request.Reason = reason
 
 	var respone Response

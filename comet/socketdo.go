@@ -70,7 +70,7 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 	addr := connString(conn)
 	pType := protoType(conn)
 
-	logs.Logger.Debug("[>>>register] request id=", id, " plat=", plat, " token=", token, " addr=", addr)
+	logs.Logger.Info("[>>>register] request id=", id, " plat=", plat, " token=", token, " addr=", addr)
 
 	var authCode byte
 
@@ -90,12 +90,35 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 		return
 	}
 
+	{
+		//相同类型终端登录
+		idf := fmt.Sprintf("%s-%d", id, plat)
+		if sess := p.pool.findSessions(idf); sess != nil {
+			logs.Logger.Info("register kick id=", id, " plat=", plat)
+			p.closeConn(sess.conn)
+		}
+		//互斥登录
+		if plat == 1 && plat == 2 {
+			var idf string
+			if plat == 1 {
+				idf = fmt.Sprintf("%s-%d", id, 2)
+			} else {
+				idf = fmt.Sprintf("%s-%d", id, 1)
+			}
+			if sess := p.pool.findSessions(idf); sess != nil {
+				logs.Logger.Info("register kick ids=", idf)
+				p.closeConn(sess.conn)
+			}
+		}
+	}
+
 	//建立session 并初始化
 	sess := new(session)
 	sess.id = id
 	sess.plat = plat
 	sess.conn = conn
 	sess.encode = encode
+	sess.token = token
 	sess.tid = 0
 
 	//保存session
@@ -104,11 +127,12 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 	p.pool.insertIds(addr, idf)
 
 	logs.Logger.Debug("[register] success sess=", sess, " addr=", addr)
+
 	//登陆成功
 	p.response(conn, msgType+1, encode, request.Tid, authCode, pType)
 
 	//上报到router
-	p.rpcCli.Notify(id, p.cometId, rpc.STATE_ONLINE, plat)
+	p.rpcCli.Notify(id, plat, token, rpc.STATE_ONLINE, p.cometId)
 
 	//处理离线消息
 	p.ProcOfflineMsg(sess, id, plat)
@@ -132,7 +156,7 @@ func (p *Comet) procUnRegister(conn interface{}) {
 	logs.Logger.Debug("[unregister] success sess=", sess, " addr=", addr)
 
 	//通知router
-	p.rpcCli.Notify(sess.id, p.cometId, rpc.STATE_OFFLINE, sess.plat)
+	p.rpcCli.Notify(sess.id, sess.plat, sess.token, rpc.STATE_OFFLINE, p.cometId)
 
 	sess.destroy()
 
@@ -151,17 +175,17 @@ func (p *Comet) procIm(conn interface{}, msg *protocol.ImUp) {
 	//session校验
 	id := p.pool.findId(addr)
 	if id == "" {
-		logs.Logger.Error("[IM]  id is nil addr=", addr)
+		logs.Logger.Error("[>>>IM]  id is nil addr=", addr)
 		p.closeConn(conn)
 		return
 	}
 	sess := p.pool.findSessions(id)
 	if sess == nil {
-		logs.Logger.Error("[IM]  session is nil addr=", addr, " id=", id)
+		logs.Logger.Error("[>>>IM]  session is nil addr=", addr, " id=", id)
 		p.closeConn(conn)
 		return
 	}
-	logs.Logger.Debug("[>>>IM]   addr=", addr, " sess=", sess, " msg=", string(request.Msg[:]))
+	logs.Logger.Info("[>>>IM]   addr=", addr, " sess=", sess, " msg=", string(request.Msg[:]))
 
 	err := p.rpcCli.MsgUpward(sess.id, sess.plat, string(request.Msg))
 	if err != nil {

@@ -63,9 +63,9 @@ func (p *Router) loadDispatcher(w http.ResponseWriter, r *http.Request) {
 
 //balancer HTTP接口 根据id和plat返回socket地址
 func (p *Router) balancer(id string, plat int) string {
-	s := p.pool.findSessions(id)
-	if s != nil {
-		c := p.pool.findComet(s.cometId)
+	sess := p.store.FindSessions(id)
+	if sess != nil {
+		c := p.pool.findComet(sess.CometId)
 		if c != nil {
 			if plat == protocol.PLAT_WEB {
 				return c.wsAddr
