@@ -27,6 +27,11 @@ func main() {
 	}()
 	runtime.GOMAXPROCS(runtime.NumCPU() * 2)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logs.Logger.Error("recover ", r)
+			}
+		}()
 		conf := goini.SetConfig("./config.ini")
 		bindAddr := conf.GetValue("http", "bindAddr")
 		http.ListenAndServe(bindAddr, nil)

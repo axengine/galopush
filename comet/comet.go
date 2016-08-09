@@ -109,6 +109,11 @@ func (p *Comet) Init() {
 }
 
 func (p *Comet) Start() {
+	defer func() {
+		if r := recover(); r != nil {
+			logs.Logger.Error("recover ", r)
+		}
+	}()
 	//rpc server
 	{
 		logs.Logger.Debug("start rpc server listen on ", p.cometRpcAddr)

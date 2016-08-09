@@ -34,16 +34,20 @@ func NewStorager(dial, pswd string, db int) *Storager {
 
 //FindSessions 查找session组合 如果未找到则返回nil
 func (p *Storager) FindSessions(id string) *Sessions {
+	//内存拷贝出去 防止多线程操作失败
+	var sess Sessions
+
 	//先查询内存
 	p.mutex.Lock()
 	s, ok := p.memStore[id]
 	p.mutex.Unlock()
 	if ok {
-		return s
+		sess = *s
+		return &sess
 	}
 
 	//如未找到则查询redis
-	var sess Sessions
+	//var sess Sessions
 	b, err := p.cli.Get(id)
 	if err != nil {
 		logs.Logger.Error("Redis err:", err)
@@ -51,15 +55,21 @@ func (p *Storager) FindSessions(id string) *Sessions {
 	}
 	err = json.Unmarshal(b, &sess)
 	if err != nil {
+		logs.Logger.Error("Unmarshal err:", err, " b=", string(b))
 		return nil
 	}
+	p.memStore[id] = &sess
 	return &sess
 }
 
 //SaveSessions 保持session组合
 func (p *Storager) SaveSessions(sess *Sessions) error {
-	b, _ := json.Marshal(sess)
-	err := p.cli.Set(sess.Id, b)
+	b, err := json.Marshal(sess)
+	if err != nil {
+		logs.Logger.Error("Marshal err:", err, " b=", string(b))
+		return err
+	}
+	err = p.cli.Set(sess.Id, b)
 	if err != nil {
 		logs.Logger.Error("Redis err:", err)
 		return err
@@ -106,10 +116,13 @@ func (p *Storager) OfflineComet(comet string) {
 			for _, it := range sess.Sess {
 				it.Online = false
 			}
-		}
-		b, _ := json.Marshal(sess)
-		if err := p.cli.Set(sess.Id, b); err != nil {
-			logs.Logger.Error("Redis err:", err)
+			b, err := json.Marshal(sess)
+			if err != nil {
+				logs.Logger.Error("Marshal err:", err, " b=", string(b))
+			}
+			if err := p.cli.Set(sess.Id, b); err != nil {
+				logs.Logger.Error("Redis err:", err)
+			}
 		}
 	}
 	p.mutex.Unlock()

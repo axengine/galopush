@@ -54,15 +54,15 @@ func (p *Pool) findSessions(id string) *session {
 }
 
 type session struct {
-	id         string
-	plat       int
-	conn       interface{}
-	encode     int
-	appleToken string
-	tid        int
-	token      string
-	mutex      sync.Mutex
-	trans      []*transaction
+	id     string
+	plat   int
+	conn   interface{}
+	encode int
+	//appleToken string
+	tid   int
+	token string
+	mutex sync.Mutex
+	trans []*transaction
 }
 
 type transaction struct {
@@ -108,6 +108,11 @@ func (p *session) checkTrans(t *transaction) {
 		t.timer = time.NewTimer(time.Second * 60)
 	}
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logs.Logger.Error("recover ", r)
+			}
+		}()
 		for {
 			select {
 			case <-t.exit: //事务退出

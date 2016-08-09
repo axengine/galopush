@@ -18,6 +18,11 @@ func (p *Comet) startSocketHandle() {
 //handleMessage 从dataChan读取数据并处理
 //dataChan数据为客户端请求或响应数据
 func (p *Comet) handleMessage() {
+	defer func() {
+		if r := recover(); r != nil {
+			logs.Logger.Error("recover ", r)
+		}
+	}()
 	for {
 		select {
 		case data, ok := <-p.dataChan:
@@ -90,27 +95,51 @@ func (p *Comet) procRegister(conn interface{}, msg *protocol.Register) {
 		return
 	}
 
-	{
-		//相同类型终端登录
-		idf := fmt.Sprintf("%s-%d", id, plat)
-		if sess := p.pool.findSessions(idf); sess != nil {
-			logs.Logger.Info("register kick id=", id, " plat=", plat)
-			p.closeConn(sess.conn)
-		}
-		//互斥登录
-		if plat == 1 && plat == 2 {
-			var idf string
-			if plat == 1 {
-				idf = fmt.Sprintf("%s-%d", id, 2)
-			} else {
-				idf = fmt.Sprintf("%s-%d", id, 1)
-			}
-			if sess := p.pool.findSessions(idf); sess != nil {
-				logs.Logger.Info("register kick ids=", idf)
-				p.closeConn(sess.conn)
-			}
-		}
-	}
+	//	{
+	//		//相同类型终端登录
+	//		idf := fmt.Sprintf("%s-%d", id, plat)
+	//		if sess := p.pool.findSessions(idf); sess != nil {
+	//			{
+	//				var sendMsg protocol.Kick
+	//				protocol.SetMsgType(&sendMsg.Header, protocol.MSGTYPE_KICK)
+	//				protocol.SetEncode(&sendMsg.Header, sess.encode)
+	//				sendMsg.Tid = uint32(sess.nextTid())
+	//				sendMsg.Len = 1
+	//				sendMsg.Reason = uint8(1)
+	//				buf := protocol.Pack(&sendMsg, pType)
+	//				logs.Logger.Info("register kick id=", id, " plat=", plat)
+	//				if err := p.write(sess.conn, buf); err != nil {
+	//					logs.Logger.Error("KICK>>> write error:", err)
+	//				}
+	//			}
+	//			p.closeConn(sess.conn)
+	//		}
+	//		//互斥登录
+	//		if plat == 1 || plat == 2 {
+	//			var idf string
+	//			if plat == 1 {
+	//				idf = fmt.Sprintf("%s-%d", id, 2)
+	//			} else {
+	//				idf = fmt.Sprintf("%s-%d", id, 1)
+	//			}
+	//			if sess := p.pool.findSessions(idf); sess != nil {
+	//				{
+	//					var sendMsg protocol.Kick
+	//					protocol.SetMsgType(&sendMsg.Header, protocol.MSGTYPE_KICK)
+	//					protocol.SetEncode(&sendMsg.Header, sess.encode)
+	//					sendMsg.Tid = uint32(sess.nextTid())
+	//					sendMsg.Len = 1
+	//					sendMsg.Reason = uint8(2)
+	//					buf := protocol.Pack(&sendMsg, pType)
+	//					logs.Logger.Info("register kick idf=", idf)
+	//					if err := p.write(sess.conn, buf); err != nil {
+	//						logs.Logger.Error("KICK>>> write error:", err)
+	//					}
+	//				}
+	//				p.closeConn(sess.conn)
+	//			}
+	//		}
+	//	}
 
 	//建立session 并初始化
 	sess := new(session)

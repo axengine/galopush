@@ -82,7 +82,7 @@ func (p *Comet) push(msg *rpc.PushRequst) {
 				p.store.SavePushMsg(id, plat, []byte(msg.Msg))
 			} else if plat == protocol.PLAT_IOS {
 				//APNS
-				go apnsPush(sess.appleToken, msg.Msg, "", msg.Flag)
+				go apnsPush(id, msg.AppleToken, "MIUX", msg.Msg, msg.Flag)
 			}
 		} else {
 			//创建事务并保存
@@ -96,9 +96,12 @@ func (p *Comet) push(msg *rpc.PushRequst) {
 		}
 	} else {
 		logs.Logger.Debug("[>>>PUSH]Not find session id=", msg.Id, " plat=", plat)
-		//这里没有session 找不到ios的设备ID 直接存离线
-		if plat != protocol.PLAT_WEB {
+
+		if plat == protocol.PLAT_ANDROID {
 			p.store.SavePushMsg(id, plat, []byte(msg.Msg))
+		} else if plat == protocol.PLAT_IOS {
+			//APNS
+			go apnsPush(id, msg.AppleToken, "MIUX", msg.Msg, msg.Flag)
 		}
 	}
 }

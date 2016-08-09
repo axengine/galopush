@@ -174,12 +174,13 @@ func (p *RpcClient) Kick(id string, plat int, token string, reason int) error {
 }
 
 //Push 下发消息
-func (p *RpcClient) Push(msgType int, id string, termtype int, flag int, msg string) error {
+func (p *RpcClient) Push(msgType int, id string, termtype int, iosToken string, flag int, msg string) error {
 	var request PushRequst
 	request.Tp = msgType
 	request.Flag = flag
 	request.Id = id
 	request.Termtype = termtype
+	request.AppleToken = iosToken
 	request.Msg = msg
 
 	var respone Response

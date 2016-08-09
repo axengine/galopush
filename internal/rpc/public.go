@@ -84,11 +84,12 @@ type KickRequst struct {
 * 方向:router->comet
  */
 type PushRequst struct {
-	Tp       int //消息类型
-	Flag     int
-	Id       string
-	Termtype int
-	Msg      string
+	Tp         int //消息类型
+	Flag       int //IOS 声音提示
+	Id         string
+	Termtype   int
+	AppleToken string
+	Msg        string
 }
 
 /* 心跳检测
