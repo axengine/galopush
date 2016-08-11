@@ -15,7 +15,7 @@ func (p *Comet) startWsServer() {
 
 func (p *Comet) wsServ() {
 	http.Handle("/", websocket.Handler(p.handlerWsconn))
-	err := http.ListenAndServe(p.uaWsAddr, nil)
+	err := http.ListenAndServe(p.uaWsBindAddr, nil)
 	if err != nil {
 		panic("ListenANdServe: " + err.Error())
 	}

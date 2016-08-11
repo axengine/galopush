@@ -37,7 +37,7 @@ func (p *Comet) tcpServ() {
 		addr   *net.TCPAddr
 		err    error
 	)
-	if addr, err = net.ResolveTCPAddr("tcp4", p.uaTcpAddr); err != nil {
+	if addr, err = net.ResolveTCPAddr("tcp4", p.uaTcpBindAddr); err != nil {
 		panic(err)
 	}
 

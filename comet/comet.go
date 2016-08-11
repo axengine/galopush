@@ -20,13 +20,16 @@ type Comet struct {
 	rpcCli        *rpc.RpcClient
 	rpcStateChan  chan int //RPC链接状态通知通道
 
-	cometRpcAddr  string //comet RPC服务地址
-	rpcSrv        *rpc.RpcServer
-	maxRpcInFight int //数据缓冲大小
+	cometRpcBindAddr    string //comet RPC监听服务地址
+	cometRpcConnectAddr string //comet RPC连接服务地址
+	rpcSrv              *rpc.RpcServer
+	maxRpcInFight       int //数据缓冲大小
 
 	//与ua交互
-	uaTcpAddr string //tcp 服务地址
-	uaWsAddr  string //websocket服务地址
+	uaTcpBindAddr    string
+	uaTcpConnectAddr string //tcp 服务地址
+	uaWsBindAddr     string
+	uaWsConnectAddr  string //websocket服务地址
 
 	dataChan     chan *socketData //数据缓冲通道
 	maxUaInFight int              //数据缓冲大小
@@ -58,17 +61,20 @@ func (p *Comet) Init() {
 
 	//comet as rpc server
 	{
-		p.cometRpcAddr = conf.GetValue("comet", "rpcAddr")
+		p.cometRpcBindAddr = conf.GetValue("comet", "rpcBindAddr")
+		p.cometRpcConnectAddr = conf.GetValue("comet", "rpcConnectAddr")
 		s := conf.GetValue("comet", "rpcServerCache")
 		p.maxRpcInFight, _ = strconv.Atoi(s)
-		logs.Logger.Debug("----comet rpc addr=", p.cometRpcAddr, " cache=", p.maxRpcInFight)
+		logs.Logger.Debug("----comet rpc addr=", p.cometRpcBindAddr, " cache=", p.maxRpcInFight)
 	}
 
 	//tcp&websocket server
 	{
-		p.uaTcpAddr = conf.GetValue("comet", "tcpAddr")
-		p.uaWsAddr = conf.GetValue("comet", "wsAddr")
-		logs.Logger.Debug("----tcp addr=", p.uaTcpAddr, " ws addr=", p.uaWsAddr, " cache=", p.maxUaInFight, " runtime=", p.runtime)
+		p.uaTcpBindAddr = conf.GetValue("comet", "tcpBindAddr")
+		p.uaTcpConnectAddr = conf.GetValue("comet", "tcpConnectAddr")
+		p.uaWsBindAddr = conf.GetValue("comet", "wsBindAddr")
+		p.uaWsConnectAddr = conf.GetValue("comet", "wsConnectAddr")
+		logs.Logger.Debug("----tcp addr=", p.uaTcpBindAddr, " ws addr=", p.uaWsConnectAddr, " cache=", p.maxUaInFight, " runtime=", p.runtime)
 	}
 
 	//ua数据缓存
@@ -116,8 +122,8 @@ func (p *Comet) Start() {
 	}()
 	//rpc server
 	{
-		logs.Logger.Debug("start rpc server listen on ", p.cometRpcAddr)
-		p.rpcSrv = rpc.NewRpcServer(p.cometRpcAddr, p.maxRpcInFight, p.RpcSyncHandle, p.RpcAsyncHandle)
+		logs.Logger.Debug("start rpc server listen on ", p.cometRpcBindAddr)
+		p.rpcSrv = rpc.NewRpcServer(p.cometRpcBindAddr, p.maxRpcInFight, p.RpcSyncHandle, p.RpcAsyncHandle)
 	}
 
 	//rpc client
@@ -134,9 +140,9 @@ func (p *Comet) Start() {
 
 	//tcp & ws server
 	{
-		logs.Logger.Debug("start tcp server listen on ", p.uaTcpAddr)
+		logs.Logger.Debug("start tcp server listen on ", p.uaTcpBindAddr)
 		p.startTcpServer()
-		logs.Logger.Debug("start ws server listen on ", p.uaWsAddr)
+		logs.Logger.Debug("start ws server listen on ", p.uaWsBindAddr)
 		p.startWsServer()
 
 		logs.Logger.Debug("start socket proc with ", p.runtime, " runtime")
@@ -175,8 +181,8 @@ func (p *Comet) checkRpc() {
 					//comet启动时注册到router
 					{
 						p.rpcCli.StartPing()
-						logs.Logger.Debug("register to router cometId=", p.cometId, " tcp=", p.uaTcpAddr, " ws=", p.uaWsAddr, " rpc=", p.cometRpcAddr)
-						if err := p.rpcCli.Register(p.cometId, p.uaTcpAddr, p.uaWsAddr, p.cometRpcAddr); err != nil {
+						logs.Logger.Debug("register to router cometId=", p.cometId, " tcp=", p.uaTcpConnectAddr, " ws=", p.uaWsConnectAddr, " rpc=", p.cometRpcConnectAddr)
+						if err := p.rpcCli.Register(p.cometId, p.uaTcpConnectAddr, p.uaWsConnectAddr, p.cometRpcConnectAddr); err != nil {
 							logs.Logger.Critical("comet register to router error ", err)
 						}
 					}
