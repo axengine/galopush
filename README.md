@@ -1,5 +1,7 @@
 ## galopush
 
+该项目已过时，推荐经过生产环境验证的：https://github.com/axengine/tuitui
+
 一个使用golang编写的push代理，接收来自调用方的push、callback、im请求，并按照既定规则推送到区分用户、区分终端类型的终端。
 galopush内部由comet和router组成，一个router管理多个comet，并实现comet负载均衡；comet从nsq订阅业务消息，并根据规则路由到comet，由comet将消息推送到终端；comet接收来自终端的消息请求，并将消息发布到nsq，由业务层自行获取。
 comet与终端（已定义Android、iOS、winPhone、web、PCClient等）之间协议采用自定义二进制协议（web与comet采用ws协议+json方式），数据传输支持加密。
